@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CATEGORIES } from "@/lib/categories";
-import { DEFAULT_BASE, PHYSICS, THROW_COOLDOWN_MS } from "@/lib/config";
+import { DEFAULT_BASE, PHYSICS, THROW_COOLDOWN_MS, WATER } from "@/lib/config";
 import {
   prefersDark,
   prefersReducedMotion,
@@ -25,6 +25,17 @@ import type { CategoryId, LatLng, Phase, Place, Point } from "@/lib/types";
 import { createCanvasController } from "@/map/canvas-map";
 import { createKakaoController, loadKakaoSdk } from "@/map/kakao";
 import type { MapController } from "@/map/types";
+
+import {
+  drawSplashes,
+  drawStone,
+  drawTrail,
+  drawWater,
+  makeSplash,
+  makeStoneShape,
+  type Splash,
+  type TrailPoint,
+} from "./water";
 
 export interface MapStageProps {
   jsKey: string;
@@ -52,12 +63,6 @@ interface Flight {
   hopEnd: number;
 }
 
-interface Ripple {
-  at: LatLng;
-  t0: number;
-}
-
-const RIPPLE_LIFE_MS = 740;
 const DOT_RADIUS = 3.2;
 
 function dotColor(cat: CategoryId, dark: boolean): string {
@@ -91,10 +96,16 @@ export default function MapStage(props: MapStageProps) {
     y: 0,
   });
   const flightRef = useRef<Flight | null>(null);
-  const ripplesRef = useRef<Ripple[]>([]);
+  const splashesRef = useRef<Splash[]>([]);
+  const trailRef = useRef<TrailPoint[]>([]);
   const pinShownAtRef = useRef(0);
   /** 연타 방지. 던지기 1회 = 리빌 조회 1회라 서버 쿼터와 직결됩니다 */
   const lastThrowRef = useRef(0);
+  /** 수면 불투명도. 목표치로 매 프레임 수렴합니다 */
+  const waterRef = useRef(0);
+  /** 이번 던지기의 조약돌 모양 (프레임마다 다시 뽑으면 모양이 떨립니다) */
+  const stoneShapeRef = useRef<number[]>(makeStoneShape(1));
+  const throwStartedAtRef = useRef(0);
 
   // 애니메이션 루프가 최신 props를 보되, 조준 중 리렌더는 일으키지 않도록 ref로 넘깁니다
   const propsRef = useRef(props);
@@ -271,11 +282,12 @@ export default function MapStage(props: MapStageProps) {
     controllerRef.current?.setInteractive(props.phase === "idle" && !props.placeMode);
   }, [ready, props.phase, props.placeMode]);
 
-  /** 다시 던지기로 idle에 돌아오면 블러를 초기화합니다 */
+  /** 다시 던지기로 idle에 돌아오면 블러와 물보라를 초기화합니다 */
   useEffect(() => {
     if (props.phase === "idle") {
       setBlur(0, 200);
-      ripplesRef.current = [];
+      splashesRef.current = [];
+      trailRef.current = [];
     }
   }, [props.phase, setBlur]);
 
@@ -296,7 +308,10 @@ export default function MapStage(props: MapStageProps) {
       const durations = plan.hopMeters.map((m) => hopDurationMs(m, longest));
 
       propsRef.current.onThrowStart();
-      ripplesRef.current = [];
+      splashesRef.current = [];
+      trailRef.current = [];
+      stoneShapeRef.current = makeStoneShape(Math.floor(Math.random() * 2 ** 31));
+      throwStartedAtRef.current = startedAt;
       setBlur(PHYSICS.blurStartPx, 180);
 
       if (prefersReducedMotion()) {
@@ -306,13 +321,12 @@ export default function MapStage(props: MapStageProps) {
         return;
       }
 
-      const now = performance.now();
       flightRef.current = {
         plan,
         durations,
         hopIndex: 0,
-        hopStart: now,
-        hopEnd: now + (durations[0] ?? PHYSICS.hopMinMs),
+        hopStart: startedAt,
+        hopEnd: startedAt + (durations[0] ?? PHYSICS.hopMinMs),
       };
     },
     [setBlur],
@@ -400,6 +414,8 @@ export default function MapStage(props: MapStageProps) {
   useEffect(() => {
     if (!ready) return;
     let raf = 0;
+    // 매 프레임 matchMedia를 만들지 않도록 한 번만 읽습니다
+    const reduced = prefersReducedMotion();
 
     const draw = () => {
       raf = requestAnimationFrame(draw);
@@ -425,8 +441,59 @@ export default function MapStage(props: MapStageProps) {
       const pxPerM = 1 / view.metersPerPixel;
       const basePt = controller.project(base);
       const now = performance.now();
+      const project = (at: LatLng) => controller.project(at);
 
-      // 1. 반경 원 — 비행 중에도 선명하게 남겨서 경계가 보이게 합니다
+      // 1. 비행 진행 — 그리기 전에 상태를 확정합니다 (수면 높이가 여기에 달려 있음)
+      const flight = flightRef.current;
+      if (flight) {
+        while (flight.hopIndex < flight.plan.points.length && now >= flight.hopEnd) {
+          const landedAt = flight.plan.points[flight.hopIndex];
+          if (landedAt) {
+            splashesRef.current.push(
+              makeSplash(landedAt, flight.hopEnd, flight.hopIndex * 7919 + 13),
+            );
+          }
+
+          const done = flight.hopIndex + 1;
+          const isFinal = done >= flight.plan.points.length;
+          setBlur(blurAfterBounce(done, flight.plan.bounces), isFinal ? 460 : 190);
+          flight.hopIndex = done;
+
+          if (isFinal) {
+            const plan = flight.plan;
+            flightRef.current = null;
+            propsRef.current.onLanded(plan);
+            break;
+          }
+          flight.hopStart = flight.hopEnd;
+          flight.hopEnd =
+            flight.hopStart + (flight.durations[flight.hopIndex] ?? PHYSICS.hopMinMs);
+        }
+      }
+
+      const active = flightRef.current;
+
+      // 2. 수면 — 조준하면 물이 차오르고, 바운스마다 빠지면서 지도가 드러납니다
+      let waterTarget = 0;
+      if (!reduced) {
+        if (phase === "idle" && aimRef.current.active) {
+          waterTarget = WATER.aimLevel;
+        } else if (phase === "flying") {
+          waterTarget = active
+            ? 1 - active.hopIndex / Math.max(1, active.plan.bounces)
+            : 0;
+        }
+      }
+      const waterEase =
+        waterTarget > waterRef.current ? WATER.easeRise : WATER.easeFall;
+      waterRef.current += (waterTarget - waterRef.current) * waterEase;
+      if (waterRef.current > 0.004) {
+        drawWater(ctx, w, h, waterRef.current, now, palette, basePt);
+      } else {
+        waterRef.current = 0;
+      }
+
+      // 3. 반경 원 — 비행 중에도 선명하게 남겨서 경계가 보이게 합니다
       ctx.save();
       ctx.setLineDash([7, 6]);
       ctx.strokeStyle = palette.water;
@@ -437,7 +504,7 @@ export default function MapStage(props: MapStageProps) {
       ctx.stroke();
       ctx.restore();
 
-      // 2. 기준점
+      // 4. 기준점
       ctx.save();
       ctx.fillStyle = palette.water;
       ctx.beginPath();
@@ -448,7 +515,7 @@ export default function MapStage(props: MapStageProps) {
       ctx.stroke();
       ctx.restore();
 
-      // 3. 조준 콘 — 예상 착지점 대신 "이만큼 흔들린다"를 보여줍니다
+      // 5. 조준 콘 — 예상 착지점 대신 "이만큼 흔들린다"를 보여줍니다
       const aim = aimRef.current;
       if (aim.active && phase === "idle") {
         const dx = aim.x - basePt.x;
@@ -492,53 +559,16 @@ export default function MapStage(props: MapStageProps) {
         }
       }
 
-      // 4. 비행 진행 — 홉 경계를 넘었으면 바운스 처리
-      const flight = flightRef.current;
-      if (flight) {
-        while (flight.hopIndex < flight.plan.points.length && now >= flight.hopEnd) {
-          const landedAt = flight.plan.points[flight.hopIndex];
-          if (landedAt) ripplesRef.current.push({ at: landedAt, t0: flight.hopEnd });
-
-          const done = flight.hopIndex + 1;
-          const isFinal = done >= flight.plan.points.length;
-          setBlur(blurAfterBounce(done, flight.plan.bounces), isFinal ? 460 : 190);
-          flight.hopIndex = done;
-
-          if (isFinal) {
-            const plan = flight.plan;
-            flightRef.current = null;
-            propsRef.current.onLanded(plan);
-            break;
-          }
-          flight.hopStart = flight.hopEnd;
-          flight.hopEnd =
-            flight.hopStart + (flight.durations[flight.hopIndex] ?? PHYSICS.hopMinMs);
-        }
-      }
-
-      // 5. 파문
-      ctx.save();
-      for (const ripple of ripplesRef.current) {
-        const age = now - ripple.t0;
-        if (age < 0 || age > RIPPLE_LIFE_MS) continue;
-        const t = age / RIPPLE_LIFE_MS;
-        const pt = controller.project(ripple.at);
-        ctx.globalAlpha = (1 - t) * 0.65;
-        ctx.strokeStyle = palette.gold;
-        ctx.lineWidth = 2 * (1 - t) + 0.6;
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 5 + t * 26, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-      if (ripplesRef.current.length > 8) {
-        ripplesRef.current = ripplesRef.current.filter(
-          (r) => now - r.t0 < RIPPLE_LIFE_MS,
+      // 6. 항적과 물보라 — 돌이 사라진 뒤에도 잔상이 남습니다
+      drawTrail(ctx, trailRef.current, now, project, palette);
+      drawSplashes(ctx, splashesRef.current, now, project, palette);
+      if (splashesRef.current.length > 8) {
+        splashesRef.current = splashesRef.current.filter(
+          (s) => now - s.t0 < WATER.splashLifeMs,
         );
       }
 
-      // 6. 돌
-      const active = flightRef.current;
+      // 7. 돌 — 수면을 스치는 납작한 조약돌
       if (active) {
         const from =
           active.hopIndex === 0
@@ -548,35 +578,35 @@ export default function MapStage(props: MapStageProps) {
         if (to) {
           const span = Math.max(1, active.hopEnd - active.hopStart);
           const t = Math.min(1, Math.max(0, (now - active.hopStart) / span));
+
+          // 위치는 위경도로 보관합니다 — 리사이즈·재투영에 안전해야 하므로
+          const at: LatLng = {
+            lat: from.lat + (to.lat - from.lat) * t,
+            lng: from.lng + (to.lng - from.lng) * t,
+          };
+          trailRef.current.push({ at, t: now });
+          if (trailRef.current.length > WATER.trailPoints) trailRef.current.shift();
+
           const a = controller.project(from);
           const b = controller.project(to);
-          const groundX = a.x + (b.x - a.x) * t;
-          const groundY = a.y + (b.y - a.y) * t;
           const hopPx = Math.hypot(b.x - a.x, b.y - a.y);
+          const point = controller.project(at);
           const lift = Math.sin(Math.PI * t) * hopPx * PHYSICS.arcRatio;
+          const spin = (now - throwStartedAtRef.current) * 0.009;
 
-          ctx.save();
-          // 바닥 그림자
-          ctx.globalAlpha = 0.2;
-          ctx.fillStyle = palette.ink;
-          ctx.beginPath();
-          ctx.ellipse(groundX, groundY, 5.5, 2.4, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          // 돌
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = palette.stone;
-          ctx.beginPath();
-          ctx.ellipse(groundX, groundY - lift, 5.4, 4.4, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = palette.surface;
-          ctx.lineWidth = 1.2;
-          ctx.stroke();
-          ctx.restore();
+          drawStone(
+            ctx,
+            point.x,
+            point.y,
+            lift,
+            spin,
+            stoneShapeRef.current,
+            palette,
+          );
         }
       }
 
-      // 7. 착지점 판정 반경
+      // 8. 착지점 판정 반경
       const revealing = phase === "reveal" || phase === "result";
       if (revealing && landing) {
         const pt = controller.project(landing);
@@ -601,7 +631,7 @@ export default function MapStage(props: MapStageProps) {
         ctx.restore();
       }
 
-      // 8. 당첨 핀 — flare는 여기에만 씁니다
+      // 9. 당첨 핀 — flare는 여기에만 씁니다
       if (revealing && winner) {
         const pt = controller.project(winner);
         const age = pinShownAtRef.current ? now - pinShownAtRef.current : 999;

@@ -3,9 +3,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "물수제비 점심",
+  title: "랜덤픽 — 점심 뭐먹을래?",
   description:
-    "기준점에서 돌을 던지면 지도 위를 통통 튀며 날아가고, 마지막 바운스에서 오늘 점심이 공개됩니다.",
+    "지도가 물로 바뀌고, 돌을 던지면 수면 위를 통통 튀며 날아갑니다. 마지막 바운스에서 물이 빠지며 오늘 점심이 공개됩니다.",
 };
 
 export const viewport: Viewport = {

@@ -1,4 +1,4 @@
-import { makeProjection, metersPerDegLng, M_PER_DEG_LAT } from "@/lib/geo";
+import { makeProjection, metersPerDegLng } from "@/lib/geo";
 import type { LatLng, Point } from "@/lib/types";
 import type { MapController, MapView } from "./types";
 
@@ -24,7 +24,8 @@ interface KakaoMap {
   getCenter(): KakaoLatLng;
   setCenter(ll: KakaoLatLng): void;
   getBounds(): KakaoBounds;
-  setBounds(bounds: KakaoBounds, ...padding: number[]): void;
+  getLevel(): number;
+  setLevel(level: number): void;
   setDraggable(on: boolean): void;
   setZoomable(on: boolean): void;
   relayout(): void;
@@ -36,7 +37,6 @@ interface KakaoMapsNamespace {
     options: { center: KakaoLatLng; level: number },
   ) => KakaoMap;
   LatLng: new (lat: number, lng: number) => KakaoLatLng;
-  LatLngBounds: new (sw: KakaoLatLng, ne: KakaoLatLng) => KakaoBounds;
   event: {
     addListener(target: unknown, type: string, handler: () => void): void;
     removeListener(target: unknown, type: string, handler: () => void): void;
@@ -160,17 +160,36 @@ export function createKakaoController(
     getView() {
       return view;
     },
+    /**
+     * 반경이 화면에 알맞게 차도록 줌 레벨을 맞춥니다.
+     *
+     * `setBounds`는 bounds를 포함하는 이산 레벨을 고르기 때문에 필요보다 훨씬 축소되는
+     * 일이 잦습니다. 대신 현재 픽셀당 미터를 측정해서 목표까지 몇 레벨 움직여야 하는지
+     * 직접 계산합니다 — 카카오 레벨은 한 단계마다 해상도가 2배씩 변하므로 log2입니다.
+     * 레벨↔해상도 표를 하드코딩하지 않아 SDK가 바뀌어도 스스로 보정됩니다.
+     */
     fitRadius(at: LatLng, radius: number) {
-      const pad = 1.25;
-      const dLat = (radius * pad) / M_PER_DEG_LAT;
-      const dLng = (radius * pad) / metersPerDegLng(at.lat);
-      const bounds = new maps.LatLngBounds(
-        new maps.LatLng(at.lat - dLat, at.lng - dLng),
-        new maps.LatLng(at.lat + dLat, at.lng + dLng),
-      );
-      map.setBounds(bounds, 0, 0, 0, 0);
       map.setCenter(new maps.LatLng(at.lat, at.lng));
       refresh();
+
+      const shortSide = Math.max(80, Math.min(view.width, view.height));
+      // 반경 원이 짧은 변의 약 80%를 차지하도록
+      const desired = (radius * 2 * 1.25) / shortSide;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const current = view.metersPerPixel;
+        if (!(current > 0)) break;
+
+        const steps = Math.round(Math.log2(desired / current));
+        if (steps === 0) break;
+
+        const level = map.getLevel();
+        const next = Math.min(14, Math.max(1, level + steps));
+        if (next === level) break;
+
+        map.setLevel(next);
+        refresh();
+      }
     },
     setInteractive(on: boolean) {
       map.setDraggable(on);

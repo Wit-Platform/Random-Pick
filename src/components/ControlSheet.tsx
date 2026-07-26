@@ -102,6 +102,12 @@ export default function ControlSheet(props: ControlSheetProps) {
           disabled={!idle}
           onChange={(e) => props.onRadius(Number(e.target.value))}
           aria-label="반경"
+          // 트랙 채움 비율 — CSS만으로는 현재 값을 알 수 없습니다
+          style={
+              {
+                "--fill": `${((radiusM - RADIUS.min) / (RADIUS.max - RADIUS.min)) * 100}%`,
+              } as React.CSSProperties
+          }
         />
       </div>
 

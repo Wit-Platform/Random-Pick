@@ -37,6 +37,30 @@ export const PHYSICS = {
   revealHoldMs: 620,
 } as const;
 
+/**
+ * 수면. 물이 블러 대신 가림막 역할을 합니다 — 지도가 물로 덮이고, 바운스마다
+ * 물이 빠지면서 지도가 드러납니다.
+ *
+ * 조준 중에는 완전 불투명이 아니라 살짝 투명하게 둡니다. 후보 점이 어렴풋이
+ * 보여야 "어느 쪽으로 던질까"라는 판단이 남기 때문입니다.
+ */
+export const WATER = {
+  aimLevel: 0.66,
+  /**
+   * 프레임당 수렴 비율. 차오를 때는 빠르게(조준에 즉각 반응), 빠질 때는 천천히
+   * (리빌이 사건처럼 느껴지도록) — 같은 값을 쓰면 물이 툭 사라져서 맥이 빠집니다.
+   */
+  easeRise: 0.19,
+  easeFall: 0.07,
+  /** 겹쳐 그릴 물결 선의 수 */
+  caustics: 6,
+  splashLifeMs: 900,
+  dropLifeMs: 520,
+  /** 돌이 남기는 항적 길이 */
+  trailPoints: 26,
+  trailLifeMs: 700,
+} as const;
+
 /** 착지점 기준 판정 반경 = clamp(R * ratio, min, max) */
 export const REVEAL = {
   ratio: 0.3,

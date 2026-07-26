@@ -7,8 +7,13 @@ export interface OverlayPalette {
   gold: string;
   ink: string;
   stone: string;
+  stoneLit: string;
+  stoneDark: string;
   stoneRing: string;
   surface: string;
+  wave: string;
+  waveDeep: string;
+  foam: string;
 }
 
 function reader(el: HTMLElement) {
@@ -37,9 +42,14 @@ export function readOverlayPalette(el: HTMLElement): OverlayPalette {
     flare: v("--flare", "#bb4325"),
     gold: v("--gold", "#8e6712"),
     ink: v("--ink", "#0e1a18"),
-    stone: v("--stone", "#263733"),
+    stone: v("--stone", "#5c6b6b"),
+    stoneLit: v("--stone-lit", "#8d9a99"),
+    stoneDark: v("--stone-dark", "#313c3d"),
     stoneRing: v("--stone-ring", "rgba(14,26,24,0.28)"),
     surface: v("--surface", "#f7f9f8"),
+    wave: v("--wave", "#2a7f8c"),
+    waveDeep: v("--wave-deep", "#0f4b57"),
+    foam: v("--foam", "#dcf1f4"),
   };
 }
 

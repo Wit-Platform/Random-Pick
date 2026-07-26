@@ -623,8 +623,9 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
     <div className="app">
       <main className="main">
         <header className="topbar">
-          <span className="brand">물수제비 점심</span>
-          <span className="brand-sub">던져서 정한다</span>
+          <span className="brand-mark" aria-hidden="true" />
+          <span className="brand">랜덤픽</span>
+          <span className="brand-sub">점심 뭐먹을래?</span>
         </header>
 
         <div className="stage-wrap">
@@ -660,7 +661,9 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
           {state.placeMode ? (
             <p className="stage-hint">지도를 탭해서 기준점을 정하세요</p>
           ) : state.phase === "idle" ? (
-            <p className="stage-hint">기준점을 당겼다 놓으세요</p>
+            <p className="stage-hint">
+              끌면 물이 차오릅니다. 당겼다 놓으면 돌이 날아갑니다
+            </p>
           ) : null}
         </div>
       </main>
