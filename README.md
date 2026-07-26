@@ -65,6 +65,10 @@ npm run preflight   # 환경변수 조합이 어떤 동작을 만드는지 확�
 키 없이 배포해도 샘플 모드로 정상 동작합니다. GitHub 연동(Vercel 대시보드 → Add New →
 Project → 이 레포 import)이 편합니다. 빌드 설정은 건드릴 것이 없습니다.
 
+> **프로젝트에 Git 저장소가 연결됐는지 확인하세요.** Git 연동 없이 만든 Vercel 프로젝트는
+> 배포 훅이 없어서 **푸시해도 아무 일도 일어나지 않습니다.** `Settings → Git`에 저장소가
+> 비어 있으면 `Connect Git Repository`로 붙이세요. 환경변수는 프로젝트 단위라 그대로 유지됩니다.
+>
 > **Production Branch에 코드가 있는지 먼저 확인하세요.** 코드가 아직 feature 브랜치에만
 > 있는 상태에서 Production Branch를 `main`으로 두면, Vercel이 `package.json`도 없는 커밋을
 > 빌드해서 **산출물 없는 배포**를 만듭니다. 결과는 모든 경로에서 404입니다.
