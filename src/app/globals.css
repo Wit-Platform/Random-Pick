@@ -190,12 +190,12 @@ button {
   background: var(--surface);
   overflow-y: auto;
   /**
-   * 지도가 히어로입니다. 패널이 56dvh를 먹으면 지도가 min-height 하한(200px)에
-   * 걸리고, 둘의 합이 화면을 넘어 패널 아래쪽이 잘립니다. 그 상태에서 섹션을 펼치면
-   * 열린 내용이 화면 밖에 생겨 "토글이 동작하지 않는다"처럼 보입니다.
+   * 끌어서 높이를 바꾸는 바텀시트입니다(useBottomSheet). 기본 44dvh, 펼치면 76dvh.
+   * 지도가 히어로이므로 기본값은 낮게 두고, 패널을 볼 때만 올립니다.
+   * 훅이 인라인 height를 덮어씁니다 — 여기 값은 JS 전 초기 상태입니다.
    */
-  max-height: 44dvh;
-  padding: 6px 18px 20px;
+  height: 44dvh;
+  padding: 0 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -216,16 +216,39 @@ button {
   flex: none;
 }
 
-/* 바텀시트 손잡이 */
-.panel::before {
-  content: "";
+/**
+ * 바텀시트 손잡이. 실제 버튼이어야 합니다 — 가상 요소(::before)는 이벤트 대상이
+ * 될 수 없어서 끌 수 없습니다. 잡기 편하도록 좁은 그립보다 넓은 히트 영역을 둡니다.
+ */
+.sheet-handle {
+  flex: none;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  padding: 10px 0 6px;
+  margin: 0 -18px;
+  border: 0;
+  background: transparent;
+  /* 끌기가 스크롤로 가로채이지 않게 */
+  touch-action: none;
+  cursor: grab;
+}
+
+.sheet-handle:active {
+  cursor: grabbing;
+}
+
+.sheet-grip {
   display: block;
   width: 38px;
   height: 4px;
   border-radius: var(--r-pill);
   background: var(--line-2);
-  margin: 0 auto 4px;
-  flex: none;
+  transition: background 130ms ease;
+}
+
+.sheet-handle:active .sheet-grip {
+  background: var(--water);
 }
 
 @media (min-width: 940px) {
@@ -234,15 +257,15 @@ button {
   }
   .panel {
     width: 400px;
-    max-height: none;
-    height: 100dvh;
+    /* 데스크톱은 전체 높이. 훅이 인라인으로 넣은 값을 이겨야 하므로 !important */
+    height: 100dvh !important;
     padding: 22px;
     border-radius: 0;
     margin-top: 0;
     border-left: 1px solid var(--line);
     box-shadow: none;
   }
-  .panel::before {
+  .sheet-handle {
     display: none;
   }
 }
@@ -264,8 +287,8 @@ button {
   position: relative;
   display: flex;
   flex: 1 1 auto;
-  /* 패널 max-height와 합쳐 화면을 넘지 않아야 합니다 */
-  min-height: 200px;
+  /* 시트를 올리면 지도가 양보해야 하므로 하한을 두지 않습니다 */
+  min-height: 0;
 }
 
 .stage {

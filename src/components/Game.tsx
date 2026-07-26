@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useState } from "react";
 
+import { useBottomSheet } from "@/hooks/useBottomSheet";
 import { useGroupFeed } from "@/hooks/useGroupFeed";
 import { ALL_CATEGORY_IDS } from "@/lib/categories";
 import {
@@ -475,6 +476,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
   /* ── 그룹 ────────────────────────────────────────────── */
 
   const groupFeed = useGroupFeed(state.groupCode, state.nick);
+  const sheet = useBottomSheet();
 
   /** 닉네임만 브라우저에 남깁니다. 좌표나 결과는 저장하지 않습니다. */
   useEffect(() => {
@@ -726,7 +728,17 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
         </div>
       </main>
 
-      <aside className="panel">
+      <aside className="panel" ref={sheet.panelRef}>
+        {/* 손잡이는 실제로 끌립니다. 탭하면 두 높이를 오갑니다 */}
+        <button
+          type="button"
+          className="sheet-handle"
+          aria-label={sheet.expanded ? "시트 내리기" : "시트 올리기"}
+          {...sheet.handleProps}
+        >
+          <span className="sheet-grip" aria-hidden="true" />
+        </button>
+
         {state.phase === "result" ? (
           <ResultCard
             winner={state.winner}
