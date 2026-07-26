@@ -18,23 +18,21 @@ concurrency:
 permissions:
   contents: read
 
+# 프로젝트를 이름으로 찾으므로 ORG_ID / PROJECT_ID를 시크릿으로 둘 필요가 없습니다.
+# 시크릿은 VERCEL_TOKEN 하나로 끝입니다.
 env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_PROJECT: random-pick
+  VERCEL_SCOPE: sirlyuns-projects
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: 필요한 시크릿이 있는지 확인
+      - name: 토큰 확인
         run: |
-          missing=""
-          [ -z "${{ secrets.VERCEL_TOKEN }}" ] && missing="$missing VERCEL_TOKEN"
-          [ -z "${{ secrets.VERCEL_ORG_ID }}" ] && missing="$missing VERCEL_ORG_ID"
-          [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ] && missing="$missing VERCEL_PROJECT_ID"
-          if [ -n "$missing" ]; then
-            echo "::error::레포 Settings > Secrets and variables > Actions 에 다음을 추가하세요:$missing"
-            echo "받는 곳은 README의 'GitHub Actions 배포' 절을 참고하세요."
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "::error::레포 Settings > Secrets and variables > Actions 에 VERCEL_TOKEN을 추가하세요."
+            echo "발급: https://vercel.com/account/tokens"
             exit 1
           fi
 
@@ -54,6 +52,18 @@ jobs:
         run: npm run lint
       - name: 테스트
         run: npm test
+
+      # 프로젝트를 이름으로 찾아 .vercel/project.json을 만듭니다.
+      # 여기서 실패하면 대개 토큰이 만료됐거나 스코프가 다른 경우입니다.
+      - name: Vercel 프로젝트 링크
+        run: |
+          if ! npx vercel@latest link --yes \
+              --project "$VERCEL_PROJECT" \
+              --scope "$VERCEL_SCOPE" \
+              --token=${{ secrets.VERCEL_TOKEN }}; then
+            echo "::error::Vercel 링크 실패. VERCEL_TOKEN이 만료됐거나 스코프($VERCEL_SCOPE)에 접근 권한이 없습니다. 새 토큰을 발급해 시크릿을 갱신하세요: https://vercel.com/account/tokens"
+            exit 1
+          fi
 
       # 환경변수를 Vercel에서 가져옵니다. NEXT_PUBLIC_* 은 빌드 시점에 번들로
       # 구워지므로 이 단계 없이 빌드하면 카카오 JS 키가 비어버립니다.
