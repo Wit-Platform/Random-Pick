@@ -55,67 +55,32 @@ KAKAO_REST_KEY=xxx npm run verify:kakao
 `category_name` 형식, 2번째 토큰이 매핑 테이블에 있는지, 45건 상한이 실제로 존재하는지,
 `x`/`y`가 경도/위도 순서인지, 술집이 실제로 섞여 들어오는지를 확인합니다.
 
-### 3. Vercel 배포 — GitHub Actions 경유
+### 3. Vercel 배포
 
-> **이 레포는 Vercel의 Git 자동 배포를 쓸 수 없습니다.**
-> Hobby 플랜은 **private organization 레포**에서의 배포를 거부합니다
-> (`Cannot deploy from a private GitHub organization repository on the Hobby plan`).
-> Vercel 대시보드에는 "연결됨"으로 보이고 GitHub도 이벤트를 정상 전달하지만,
-> 빌드가 이 메시지로 실패합니다.
+> **미해결: 이 레포는 Vercel의 Git 자동 배포를 쓸 수 없습니다.**
 >
-> CLI 배포는 파일을 직접 업로드하므로 이 제약을 받지 않습니다. 그래서 배포를
-> `.github/workflows/deploy.yml`로 옮겼습니다 — 레포는 org에 비공개로 두면서
-> `main` 푸시마다 자동 배포됩니다.
+> Hobby 플랜은 **private organization 레포**에서의 배포를 거부합니다.
+> ```
+> Cannot deploy from a private GitHub organization repository on the Hobby plan
+> ```
+> Vercel 대시보드에는 "연결됨"으로 보이고 GitHub도 이벤트를 정상 전달하지만
+> 빌드가 이 메시지로 실패합니다. **코드·빌드 설정 문제가 아니라 플랜 제약입니다.**
+>
+> 선택지:
+> 1. **레포를 개인 계정으로 이전** — Hobby는 개인 비공개 레포는 허용합니다. 무료이고
+>    Git 연동이 그대로 동작하지만 org 밖으로 나갑니다.
+> 2. **public 전환** — 즉시 해결. 커밋된 파일에 키는 없습니다
+>    (`.env.example`은 빈 값, `.env.local`은 gitignore). 조직 정책 확인이 필요합니다.
+> 3. **Vercel Pro** — 구조 그대로. 월 $20/멤버.
 
-**필요한 시크릿은 `VERCEL_TOKEN` 하나입니다.**
-[vercel.com/account/tokens](https://vercel.com/account/tokens)에서 발급해
-레포 `Settings → Secrets and variables → Actions`에 넣으세요.
-
-`VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`는 두지 않습니다 — 워크플로가 프로젝트를
-**이름으로** 찾습니다. 프로젝트명·스코프는 `deploy.yml`의 `env`에 평문으로 있습니다
-(비밀이 아니고, 바뀌면 눈에 보이는 곳에서 고치는 게 낫습니다).
-
-```yaml
-env:
-  VERCEL_PROJECT: random-pick
-  VERCEL_SCOPE: sirlyuns-projects
-```
-
-넣고 나면 Actions 탭에서 `Run workflow`로 즉시 배포할 수 있습니다.
-워크플로는 배포 전에 `typecheck` / `lint` / `test`를 통과해야 진행합니다.
-
-#### 토큰 관리
-
-> **Vercel 토큰은 프로젝트 단위로 좁힐 수 없습니다.** 스코프 전체에 대한 API 권한을
-> 가지므로 프로젝트 생성·삭제와 **환경변수 읽기**가 가능합니다. 카카오 REST 키가
-> 이 토큰으로 열립니다. 조직 계정이면 이 점을 감안해서 만료를 짧게 두세요.
-
-- **발급 시 만료 선택**: 1일 / 7일 / 30일 / 60일 / 90일 / 1년 / 무기한.
-  무기한은 관리가 없어 편하지만 영구 크레덴셜이 남습니다. **1년 + 캘린더 알림**을 권합니다.
-- **만료되면** `Vercel 프로젝트 링크` 단계에서 실패하고, 새 토큰을 발급해 시크릿을
-  갱신하라는 메시지가 뜹니다. 조치는 토큰 재발급 + 시크릿 교체 2분입니다.
-- **알게 되는 시점은 다음 푸시 때입니다.** 급할 때 발견하는 게 싫으면
-  로컬에서 `npx vercel --prod`로 우회 배포할 수 있습니다.
-- **유출 시**: [vercel.com/account/tokens](https://vercel.com/account/tokens)에서 즉시 폐기하고,
-  카카오 REST 키도 함께 재발급하세요 (토큰으로 읽혔을 수 있습니다).
-- GitHub Actions에서 OIDC로 토큰을 대체하는 경로는 Vercel CLI 배포에 없습니다.
-  장기 크레덴셜을 피할 방법이 사실상 없으니, 만료 주기로 관리하는 편이 현실적입니다.
-
-> **Vercel 쪽 Git 연결은 끊어두세요** (`Settings → Git → Disconnect`).
-> 남겨두면 푸시마다 위 오류로 실패한 Vercel 체크가 계속 붙어 커밋마다 빨간 ✗가 생깁니다.
-
-수동으로 한 번 올리려면 로컬에서:
+당장 배포하려면 로컬에서 직접 올릴 수 있습니다.
 
 ```bash
+npm run preflight   # 환경변수 조합이 어떤 동작을 만드는지 확인
 npx vercel --prod
 ```
 
 **카카오 키보다 배포가 먼저입니다.** 카카오 콘솔에 등록할 도메인이 배포 후에 생깁니다.
-
-```bash
-npm run preflight   # 환경변수 조합이 어떤 동작을 만드는지 확인
-```
-
 키 없이 배포해도 샘플 모드로 정상 동작합니다.
 
 ### 배포가 안 될 때 확인 순서
