@@ -55,7 +55,43 @@ KAKAO_REST_KEY=xxx npm run verify:kakao
 `category_name` 형식, 2번째 토큰이 매핑 테이블에 있는지, 45건 상한이 실제로 존재하는지,
 `x`/`y`가 경도/위도 순서인지, 술집이 실제로 섞여 들어오는지를 확인합니다.
 
-### 3. Vercel 배포
+### 3. Vercel 배포 — GitHub Actions 경유
+
+> **이 레포는 Vercel의 Git 자동 배포를 쓸 수 없습니다.**
+> Hobby 플랜은 **private organization 레포**에서의 배포를 거부합니다
+> (`Cannot deploy from a private GitHub organization repository on the Hobby plan`).
+> Vercel 대시보드에는 "연결됨"으로 보이고 GitHub도 이벤트를 정상 전달하지만,
+> 빌드가 이 메시지로 실패합니다.
+>
+> CLI 배포는 파일을 직접 업로드하므로 이 제약을 받지 않습니다. 그래서 배포를
+> `.github/workflows/deploy.yml`로 옮겼습니다 — 레포는 org에 비공개로 두면서
+> `main` 푸시마다 자동 배포됩니다.
+
+**레포 Settings → Secrets and variables → Actions**에 세 개를 넣어야 합니다.
+
+| Secret | 받는 곳 |
+| --- | --- |
+| `VERCEL_TOKEN` | [vercel.com/account/tokens](https://vercel.com/account/tokens) → Create Token |
+| `VERCEL_ORG_ID` | 아래 `vercel link` 실행 후 `.vercel/project.json`의 `orgId` |
+| `VERCEL_PROJECT_ID` | 같은 파일의 `projectId` |
+
+```bash
+npx vercel login
+npx vercel link          # 프로젝트 선택
+cat .vercel/project.json # orgId / projectId 확인 (.vercel은 gitignore됨)
+```
+
+넣고 나면 Actions 탭에서 `Run workflow`로 즉시 배포할 수 있습니다.
+워크플로는 배포 전에 `typecheck` / `lint` / `test`를 통과해야 진행합니다.
+
+> **Vercel 쪽 Git 연결은 끊어두세요** (`Settings → Git → Disconnect`).
+> 남겨두면 푸시마다 위 오류로 실패한 Vercel 체크가 계속 붙어 커밋마다 빨간 ✗가 생깁니다.
+
+수동으로 한 번 올리려면 로컬에서:
+
+```bash
+npx vercel --prod
+```
 
 **카카오 키보다 배포가 먼저입니다.** 카카오 콘솔에 등록할 도메인이 배포 후에 생깁니다.
 
@@ -63,23 +99,26 @@ KAKAO_REST_KEY=xxx npm run verify:kakao
 npm run preflight   # 환경변수 조합이 어떤 동작을 만드는지 확인
 ```
 
-키 없이 배포해도 샘플 모드로 정상 동작합니다. GitHub 연동(Vercel 대시보드 → Add New →
-Project → 이 레포 import)이 편합니다. 빌드 설정은 건드릴 것이 없습니다.
+키 없이 배포해도 샘플 모드로 정상 동작합니다.
 
-> **프로젝트에 Git 저장소가 연결됐는지 확인하세요.** Git 연동 없이 만든 Vercel 프로젝트는
-> 배포 훅이 없어서 **푸시해도 아무 일도 일어나지 않습니다.** `Settings → Git`에 저장소가
-> 비어 있으면 `Connect Git Repository`로 붙이세요. 환경변수는 프로젝트 단위라 그대로 유지됩니다.
->
-> **Production Branch에 코드가 있는지 먼저 확인하세요.** 코드가 아직 feature 브랜치에만
-> 있는 상태에서 Production Branch를 `main`으로 두면, Vercel이 `package.json`도 없는 커밋을
-> 빌드해서 **산출물 없는 배포**를 만듭니다. 결과는 모든 경로에서 404입니다.
->
-> **빌드 시간이 1~2초면 빌드가 안 돌았다는 신호입니다.** 이 프로젝트의 정상 빌드는
-> 10초 이상 걸립니다. Deployments의 Duration 열을 먼저 보세요.
->
-> **Redeploy는 최신 코드를 배포하지 않습니다** — 그 배포와 **같은 커밋**을 다시 배포합니다.
-> 머지한 뒤에는 Redeploy로 해결되지 않고, `main`에 **새 커밋을 푸시**해야 현재 코드가
-> 배포됩니다.
+### 배포가 안 될 때 확인 순서
+
+이 프로젝트를 세우면서 실제로 겪은 것들입니다. 위에서부터 확인하면 대부분 걸립니다.
+
+1. **GitHub 커밋에 붙은 Vercel 체크의 실패 사유를 먼저 읽으세요.** Vercel 대시보드보다
+   빠릅니다. `gh api repos/<owner>/<repo>/commits/<sha>/status`의 `description`에 이유가
+   그대로 들어 있습니다 — private org 레포 제약도 여기서 발견했습니다.
+2. **빌드 시간이 1~2초면 빌드가 안 돌았다는 신호입니다.** 정상 빌드는 30초 이상 걸립니다.
+   Deployments의 Duration 열을 먼저 보세요.
+3. **Production Branch에 코드가 있는지 확인하세요.** 코드가 feature 브랜치에만 있는 상태로
+   `main`을 Production Branch로 두면, `package.json`도 없는 커밋을 빌드해 산출물 없는
+   배포가 만들어지고 모든 경로가 404가 됩니다.
+4. **Redeploy는 최신 코드를 배포하지 않습니다** — 그 배포와 **같은 커밋**을 다시 배포합니다.
+   머지한 뒤에는 Redeploy로 해결되지 않습니다.
+5. **`NEXT_PUBLIC_*`는 빌드 시점에 번들로 구워집니다.** 환경변수만 추가하고 재배포하지
+   않으면 기존 배포는 그 값을 영원히 모릅니다. 재배포 시 빌드 캐시도 끄세요.
+6. **CDN 캐시에 속지 마세요.** 응답 헤더의 `age`가 계속 늘어나면 새 배포가 아예 생성되지
+   않은 것입니다. 배포되면 `age`가 0으로 돌아갑니다.
 
 배포되면 도메인이 세 종류 생깁니다.
 
