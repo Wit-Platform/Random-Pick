@@ -1124,8 +1124,15 @@ textarea:focus-visible {
   border-color: var(--water);
 }
 
-/* 봇용 미끼 — 사람에게는 보이지 않지만 화면에서 완전히 제거하지는 않습니다 */
-.honeypot {
+/**
+ * 봇용 미끼 — 사람에게는 보이지 않지만 화면에서 완전히 제거하지는 않습니다.
+ *
+ * 선택자에 `input[type="text"]`를 함께 씁니다. `.honeypot`만 쓰면 특이도가
+ * (0,1,0)이라 위쪽의 `input[type="text"] { width: 100% }`(0,1,1)에 져서
+ * 1px이 아닌 100% 너비로 커지고, absolute 배치 탓에 패널 밖으로 삐져나가
+ * 좌우 스크롤이 생깁니다.
+ */
+input[type="text"].honeypot {
   position: absolute;
   width: 1px;
   height: 1px;
