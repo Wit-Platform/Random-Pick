@@ -6,6 +6,8 @@ import { categoryLabel } from "@/lib/categories";
 import { formatDistance, walkMinutes } from "@/lib/geo";
 import type { DataSource, Place } from "@/lib/types";
 
+import type { MissReason } from "./Game";
+
 export interface ResultCardProps {
   winner: Place | null;
   distFromBase: number;
@@ -13,6 +15,8 @@ export interface ResultCardProps {
   source: DataSource;
   decided: boolean;
   missStreak: number;
+  /** 허탕 사유 — 조치가 다르므로 문구를 나눕니다 */
+  missReason: MissReason;
   /** 그룹에 참가 중인지 — 결정 시 결과가 공개된다는 고지를 띄웁니다 */
   shared: boolean;
   onAgain: () => void;
@@ -21,7 +25,7 @@ export interface ResultCardProps {
 }
 
 export default function ResultCard(props: ResultCardProps) {
-  const { winner, source, decided, missStreak, shared } = props;
+  const { winner, source, decided, missStreak, missReason, shared } = props;
   const headingRef = useRef<HTMLParagraphElement | null>(null);
 
   /**
@@ -45,7 +49,9 @@ export default function ResultCard(props: ResultCardProps) {
           허탕
         </p>
         <p className="hint">
-          돌이 떨어진 자리 근처에 조건에 맞는 곳이 없었습니다.
+          {missReason === "overshoot"
+            ? "너무 멀리 던졌습니다. 돌이 반경을 넘어갔습니다."
+            : "돌이 떨어진 자리 근처에 조건에 맞는 곳이 없었습니다."}
         </p>
         <div className="row">
           <button type="button" className="btn primary" onClick={props.onAgain}>

@@ -201,6 +201,16 @@ button {
   z-index: 2;
 }
 
+/**
+ * flex 자식은 기본 flex-shrink: 1 입니다. 패널 내용이 max-height를 넘으면
+ * 스크롤이 생기기 전에 자식들이 먼저 압축되고, overflow:hidden이 걸린 결과 카드는
+ * 내용이 잘려서 "버튼이 없는" 것처럼 보입니다. 그룹 섹션을 펼쳐 내용이 길어질 때만
+ * 재현되던 원인입니다. 압축을 막고 넘치는 만큼 스크롤하게 둡니다.
+ */
+.panel > * {
+  flex: none;
+}
+
 /* 바텀시트 손잡이 */
 .panel::before {
   content: "";

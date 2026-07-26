@@ -30,6 +30,9 @@ import ResultCard from "./ResultCard";
 
 const NICK_STORAGE_KEY = "lunch:nick";
 
+/** 허탕 사유. 사용자가 할 수 있는 조치가 달라서 구분합니다 */
+export type MissReason = "overshoot" | "empty" | null;
+
 export interface GameProps {
   jsKey: string;
   /** 카카오 REST 키가 서버에 있는지 — 없으면 처음부터 샘플 데이터입니다 */
@@ -48,6 +51,8 @@ interface State {
   sampleReason?: SampleReason;
   /** 429 등 일시적 안내. 다음 성공 응답에서 사라집니다 */
   notice: string | null;
+  /** 허탕 사유 — 너무 멀리 던졌는지, 그 자리가 비었는지 */
+  miss: MissReason;
   locating: boolean;
   geoDenied: boolean;
   landing: LatLng | null;
@@ -83,6 +88,7 @@ type Action =
       winner: Place | null;
       source: DataSource | null;
       reason?: SampleReason;
+      miss: MissReason;
     }
   | { type: "showResult" }
   | { type: "again" }
@@ -104,6 +110,7 @@ const initialState: State = {
   placeMode: false,
   source: null,
   notice: null,
+  miss: null,
   locating: true,
   geoDenied: false,
   landing: null,
@@ -182,6 +189,7 @@ function reducer(state: State, action: Action): State {
         winner: null,
         decided: false,
         resolving: false,
+        miss: null,
       };
 
     case "landed":
@@ -195,6 +203,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         resolving: false,
         winner,
+        miss: action.miss,
         source: action.source ?? state.source,
         sampleReason: action.reason ?? state.sampleReason,
         notice: action.source ? null : state.notice,
@@ -320,20 +329,24 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
   /**
    * 착지 후 판정. **던지기 전에는 아무것도 조회하지 않습니다.**
    *
-   * 예전에는 기준점 반경 내 후보를 미리 받아두고, 당첨자도 "기준점 반경 안"이어야
-   * 한다는 조건을 걸었습니다. 그런데 던지기는 반경의 1.3배까지 날아가므로 멀리 던지면
-   * 돌 바로 옆에 식당이 있어도 그 필터에 걸려 허탕이 됐습니다. 실측에서 착지점 1008m,
-   * 당첨 매장 995m로 간신히 통과하는 경우까지 나왔습니다.
+   * 허탕은 **반경을 넘겨 던졌을 때** 납니다. 착지점이 반경 밖이면 조회 없이 바로
+   * 허탕이므로 판정이 예측 가능하고("너무 멀리 갔다") 카카오 호출도 아낍니다.
    *
-   * 이제 판정 기준은 하나입니다 — **돌이 떨어진 자리에서 가장 가까운 곳.**
-   * 반경 슬라이더는 "얼마나 멀리까지 날아가는가"를 정하고, 허탕은 착지점 주변이
-   * 실제로 비어 있을 때만 납니다. 카카오 호출도 던지기당 1회로 줄어듭니다.
+   * 반경 안에 떨어졌으면 **그 자리에서 가장 가까운 곳**이 당첨입니다. 예전에는
+   * 당첨자까지 "기준점 반경 안"이어야 해서, 반경 안에 떨어졌는데도 옆 가게가
+   * 반경을 살짝 넘으면 허탕이 됐습니다 (실측: 착지점 1008m / 매장 995m).
    */
   const { resolving, landing } = state;
   useEffect(() => {
     if (!resolving || !landing) return;
+
+    // 반경을 넘겨 던졌으면 조회할 필요가 없습니다
+    if (distanceM(base, landing) > radiusM) {
+      dispatch({ type: "reveal", winner: null, source: null, miss: "overshoot" });
+      return;
+    }
     if (cats.length === 0) {
-      dispatch({ type: "reveal", winner: null, source: null });
+      dispatch({ type: "reveal", winner: null, source: null, miss: "empty" });
       return;
     }
 
@@ -365,22 +378,24 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
       })
       .then((data) => {
         if (abort.signal.aborted) return;
+        const winner = data?.places[0] ?? null;
         dispatch({
           type: "reveal",
-          winner: data?.places[0] ?? null,
+          winner,
           source: data?.source ?? null,
           reason: data?.reason,
+          miss: winner ? null : "empty",
         });
       })
       .catch(() => {
         // 조회 실패는 허탕으로 처리합니다 — 에러로 게임을 막지 않습니다
         if (!abort.signal.aborted) {
-          dispatch({ type: "reveal", winner: null, source: null });
+          dispatch({ type: "reveal", winner: null, source: null, miss: "empty" });
         }
       });
 
     return () => abort.abort();
-  }, [resolving, landing, radiusM, cats]);
+  }, [resolving, landing, base, radiusM, cats]);
 
   /* 핀이 꽂히고 잠깐 뒤에 결과 카드를 올립니다 */
   useEffect(() => {
@@ -623,6 +638,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
             source={state.source ?? "sample"}
             decided={state.decided}
             missStreak={state.missStreak}
+            missReason={state.miss}
             onAgain={() => dispatch({ type: "again" })}
             onDecide={onDecide}
             onWiden={() => dispatch({ type: "widenRadius" })}
