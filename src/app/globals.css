@@ -16,7 +16,7 @@
   --line-2: #b4c2be;
 
   --water: #0d5852;
-  --water-soft: #dce8e5;
+  --water-soft: #cfe4df;
   --flare: #bb4325;
   --flare-soft: #f6e1da;
   --gold: #8e6712;
@@ -440,10 +440,6 @@ button {
     transform 90ms ease;
 }
 
-.btn:hover:not(:disabled) {
-  border-color: var(--water);
-  color: var(--water);
-}
 
 .btn:active:not(:disabled) {
   transform: scale(0.97);
@@ -454,9 +450,15 @@ button {
   cursor: not-allowed;
 }
 
+/**
+ * 선택 상태는 hover가 덮어도 구분돼야 합니다. 데스크톱에서 마우스를 올려둔 채
+ * 해제하면 hover 스타일(테두리·글자색)이 그대로 남아, 배경 차이만으로는
+ * 꺼진 것이 보이지 않습니다. 안쪽 링을 더해 테두리가 두 겹으로 읽히게 합니다.
+ */
 .btn.on {
   background: var(--water-soft);
   border-color: var(--water);
+  box-shadow: inset 0 0 0 1px var(--water);
   color: var(--water);
   font-weight: 650;
 }
@@ -470,10 +472,6 @@ button {
   box-shadow: var(--shadow-1);
 }
 
-.btn.primary:hover:not(:disabled) {
-  color: var(--surface);
-  filter: brightness(1.1);
-}
 
 .btn.block {
   width: 100%;
@@ -580,10 +578,6 @@ input[type="range"]::-moz-range-thumb {
   content: "";
 }
 
-.group-toggle:hover {
-  border-color: var(--water);
-  color: var(--water);
-}
 
 .group-toggle-code {
   font-family: var(--font-mono);
@@ -911,10 +905,6 @@ input[type="text"]:focus-visible {
   margin-left: 4px;
 }
 
-.help-btn:hover {
-  border-color: var(--water);
-  color: var(--water);
-}
 
 .guide-scrim {
   position: fixed;
@@ -1178,9 +1168,6 @@ input[type="text"].honeypot {
   text-underline-offset: 3px;
 }
 
-.footer-links a:hover {
-  color: var(--water);
-}
 
 .footer-links span {
   color: var(--ink-3);
@@ -1275,10 +1262,6 @@ input[type="text"].honeypot {
   text-decoration: none;
 }
 
-.doc-back a:hover {
-  color: var(--water);
-  text-decoration: underline;
-}
 
 .doc-back-bottom {
   margin: 44px 0 0;
@@ -1335,6 +1318,44 @@ input[type="text"].honeypot {
 
 .doc-table tr:last-child td {
   border-bottom: none;
+}
+
+/**
+ * hover 스타일은 실제로 hover가 되는 기기에만 적용합니다.
+ *
+ * 터치에서는 탭한 요소에 :hover가 그대로 남습니다(sticky hover). hover 스타일이
+ * 선택 상태(.on)와 비슷하면, 칩을 눌러 해제했는데도 켜진 것처럼 보이고 다른 칩을
+ * 눌러 hover가 옮겨간 뒤에야 꺼져 보입니다.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled) {
+    border-color: var(--water);
+    color: var(--water);
+  }
+
+  .btn.primary:hover:not(:disabled) {
+    color: var(--surface);
+    filter: brightness(1.1);
+  }
+
+  .group-toggle:hover {
+    border-color: var(--water);
+    color: var(--water);
+  }
+
+  .help-btn:hover {
+    border-color: var(--water);
+    color: var(--water);
+  }
+
+  .footer-links a:hover {
+    color: var(--water);
+  }
+
+  .doc-back a:hover {
+    color: var(--water);
+    text-decoration: underline;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
