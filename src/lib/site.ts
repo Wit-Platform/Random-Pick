@@ -17,3 +17,9 @@ export const SITE = {
     .replace(/\/$/, ""),
   locale: "ko_KR",
 } as const;
+
+/** 피드백·문의 창구 */
+export const CONTACT_EMAIL = "sirlyun23@gmail.com";
+
+/** 약관·처리방침 시행일. 내용을 바꿀 때 함께 올려주세요 */
+export const POLICY_EFFECTIVE_DATE = "2026년 7월 26일";

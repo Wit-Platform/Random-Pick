@@ -176,6 +176,117 @@ export function drawSplashes(
 }
 
 /**
+ * 당긴 세기 게이지. 기준점을 감싸는 270° 링으로 그립니다.
+ *
+ * 손가락이 화면을 가리기 때문에 포인터가 아니라 **기준점 주위**에 둡니다.
+ * 최대치에 닿으면 색이 금색으로 바뀌고 맥동해서, 숫자 없이도 "더 당겨도 소용없다"를
+ * 알 수 있습니다.
+ */
+export function drawPowerGauge(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  power: number,
+  palette: OverlayPalette,
+  now: number,
+): void {
+  const radius = 30;
+  const start = Math.PI * 0.75;
+  const sweep = Math.PI * 1.5;
+  const filled = Math.min(1, Math.max(0, power));
+  const maxed = filled >= 0.995;
+
+  ctx.save();
+  ctx.lineCap = "round";
+
+  // 트랙
+  ctx.globalAlpha = 0.55;
+  ctx.strokeStyle = palette.surface;
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, start, start + sweep);
+  ctx.stroke();
+
+  // 눈금 — 절반 지점
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = palette.ink;
+  const half = start + sweep * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(cx + Math.cos(half) * (radius - 5), cy + Math.sin(half) * (radius - 5));
+  ctx.lineTo(cx + Math.cos(half) * (radius + 5), cy + Math.sin(half) * (radius + 5));
+  ctx.stroke();
+
+  // 채움
+  if (filled > 0.001) {
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = maxed ? palette.gold : palette.water;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, start, start + sweep * filled);
+    ctx.stroke();
+  }
+
+  // 최대치 맥동
+  if (maxed) {
+    const pulse = (now % 700) / 700;
+    ctx.globalAlpha = (1 - pulse) * 0.5;
+    ctx.strokeStyle = palette.gold;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius + pulse * 12, start, start + sweep);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/** 슬링샷 밴드 — 기준점에서 손가락까지 당겨진 줄과 그 끝의 돌 */
+export function drawPullBand(
+  ctx: CanvasRenderingContext2D,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  palette: OverlayPalette,
+): void {
+  ctx.save();
+  ctx.lineCap = "round";
+
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = palette.water;
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.45;
+  ctx.strokeStyle = palette.surface;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+
+  // 손가락 끝의 돌
+  ctx.globalAlpha = 1;
+  const shade = ctx.createLinearGradient(toX - 7, toY - 7, toX + 7, toY + 7);
+  shade.addColorStop(0, palette.stoneLit);
+  shade.addColorStop(0.55, palette.stone);
+  shade.addColorStop(1, palette.stoneDark);
+  ctx.fillStyle = shade;
+  ctx.beginPath();
+  ctx.ellipse(toX, toY, 7.5, 5.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = palette.surface;
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
  * 납작한 조약돌. 위에서 내려다보므로 세로를 눌러 그리고, 나는 동안 회전시켜
  * 물수제비 특유의 스핀을 만듭니다.
  */

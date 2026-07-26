@@ -25,6 +25,8 @@ import { createKakaoController, loadKakaoSdk } from "@/map/kakao";
 import type { MapController } from "@/map/types";
 
 import {
+  drawPowerGauge,
+  drawPullBand,
   drawSplashes,
   drawStone,
   drawTrail,
@@ -295,6 +297,9 @@ export default function MapStage(props: MapStageProps) {
       if (placeMode || phase !== "idle" || !base) return;
       const pt = localPoint(e);
       aimRef.current = { active: true, x: pt.x, y: pt.y };
+      // 힌트 말풍선이 당기는 자리를 가리므로 조준 중에는 숨깁니다.
+      // ref로 직접 표시해서 드래그 중 리렌더를 만들지 않습니다.
+      if (stageRef.current) stageRef.current.dataset.aiming = "true";
       e.currentTarget.setPointerCapture(e.pointerId);
     },
     [localPoint],
@@ -315,6 +320,8 @@ export default function MapStage(props: MapStageProps) {
       const controller = controllerRef.current;
       const { phase, base, placeMode, radiusM } = propsRef.current;
       const pt = localPoint(e);
+
+      if (stageRef.current) delete stageRef.current.dataset.aiming;
 
       if (placeMode) {
         if (controller) propsRef.current.onPickBase(controller.unproject(pt));
@@ -338,6 +345,7 @@ export default function MapStage(props: MapStageProps) {
 
   const onPointerCancel = useCallback(() => {
     aimRef.current.active = false;
+    if (stageRef.current) delete stageRef.current.dataset.aiming;
   }, []);
 
   /** 접근성·키보드 대체 수단 — 방향을 무작위로 골라 최대에 가까운 힘으로 던집니다 */
@@ -465,13 +473,14 @@ export default function MapStage(props: MapStageProps) {
       ctx.stroke();
       ctx.restore();
 
-      // 5. 조준 콘 — 예상 착지점 대신 "이만큼 흔들린다"를 보여줍니다
+      // 5. 조준 — 흔들림 부채꼴 + 슬링샷 밴드 + 세기 게이지
       const aim = aimRef.current;
       if (aim.active && phase === "idle") {
         const dx = aim.x - basePt.x;
         const dy = aim.y - basePt.y;
         const resolved = pullToAim(dx, dy);
-        if (resolved.power > 0.04) {
+
+        if (resolved.power > 0.02) {
           const reach = expectedDistanceM(radiusM, resolved.power) * pxPerM;
           const half = aimConeHalfAngle();
           const wobble = Math.sin(now / 95) * 0.022;
@@ -489,24 +498,18 @@ export default function MapStage(props: MapStageProps) {
           grad.addColorStop(1, palette.water);
 
           ctx.save();
-          ctx.globalAlpha = 0.24;
+          ctx.globalAlpha = 0.26;
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.moveTo(basePt.x, basePt.y);
           ctx.arc(basePt.x, basePt.y, reach, mid - half, mid + half);
           ctx.closePath();
           ctx.fill();
-
-          ctx.globalAlpha = 0.7;
-          ctx.strokeStyle = palette.water;
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath();
-          ctx.moveTo(basePt.x, basePt.y);
-          ctx.lineTo(aim.x, aim.y);
-          ctx.stroke();
           ctx.restore();
         }
+
+        drawPullBand(ctx, basePt.x, basePt.y, aim.x, aim.y, palette);
+        drawPowerGauge(ctx, basePt.x, basePt.y, resolved.power, palette, now);
       }
 
       // 6. 항적과 물보라 — 돌이 사라진 뒤에도 잔상이 남습니다

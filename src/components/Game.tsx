@@ -27,6 +27,7 @@ import ControlSheet from "./ControlSheet";
 import GroupPanel from "./GroupPanel";
 import MapStage from "./MapStage";
 import ResultCard from "./ResultCard";
+import SiteFooter from "./SiteFooter";
 
 const NICK_STORAGE_KEY = "lunch:nick";
 
@@ -678,6 +679,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
           />
         ) : null}
 
+        <SiteFooter />
       </aside>
     </div>
   );
