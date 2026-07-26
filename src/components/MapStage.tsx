@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CATEGORIES } from "@/lib/categories";
 import { DEFAULT_BASE, PHYSICS, THROW_COOLDOWN_MS, WATER } from "@/lib/config";
 import {
-  prefersDark,
   prefersReducedMotion,
   readMapPalette,
   readOverlayPalette,
@@ -21,7 +19,7 @@ import {
   revealRadiusM,
   type ThrowPlan,
 } from "@/lib/physics";
-import type { CategoryId, LatLng, Phase, Place, Point } from "@/lib/types";
+import type { LatLng, Phase, Place, Point } from "@/lib/types";
 import { createCanvasController } from "@/map/canvas-map";
 import { createKakaoController, loadKakaoSdk } from "@/map/kakao";
 import type { MapController } from "@/map/types";
@@ -41,7 +39,6 @@ export interface MapStageProps {
   jsKey: string;
   base: LatLng | null;
   radiusM: number;
-  candidates: Place[];
   phase: Phase;
   placeMode: boolean;
   winner: Place | null;
@@ -63,14 +60,6 @@ interface Flight {
   hopEnd: number;
 }
 
-const DOT_RADIUS = 3.2;
-
-function dotColor(cat: CategoryId, dark: boolean): string {
-  const meta = CATEGORIES.find((c) => c.id === cat);
-  if (!meta) return dark ? "#8CA09B" : "#77857F";
-  return dark ? meta.dotDark : meta.dot;
-}
-
 /** 방위각(북=0, 시계방향) → 캔버스 각도(x축 기준, y는 아래로 증가) */
 function bearingToCanvasAngle(bearingRad: number): number {
   return Math.atan2(-Math.cos(bearingRad), Math.sin(bearingRad));
@@ -83,12 +72,10 @@ export default function MapStage(props: MapStageProps) {
   const layerRef = useRef<HTMLDivElement | null>(null);
   const kakaoHostRef = useRef<HTMLDivElement | null>(null);
   const fallbackRef = useRef<HTMLCanvasElement | null>(null);
-  const dotsRef = useRef<HTMLCanvasElement | null>(null);
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
 
   const controllerRef = useRef<MapController | null>(null);
   const paletteRef = useRef<OverlayPalette | null>(null);
-  const darkRef = useRef(false);
 
   const aimRef = useRef<{ active: boolean; x: number; y: number }>({
     active: false,
@@ -129,45 +116,14 @@ export default function MapStage(props: MapStageProps) {
     return dpr;
   }, []);
 
-  /* ── 후보 점 (블러 레이어 안쪽에 그려서 비행 중 가려집니다) ── */
-
-  const drawDots = useCallback(() => {
-    const canvas = dotsRef.current;
-    const controller = controllerRef.current;
-    if (!canvas || !controller) return;
-
-    const dpr = sizeCanvas(canvas);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-
-    const dark = darkRef.current;
-    for (const place of propsRef.current.candidates) {
-      const pt = controller.project(place);
-      if (pt.x < -8 || pt.y < -8 || pt.x > w + 8 || pt.y > h + 8) continue;
-      ctx.globalAlpha = 0.82;
-      ctx.fillStyle = dotColor(place.cat, dark);
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, DOT_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }, [sizeCanvas]);
-
-  /** 폴백 지도 + 후보 점을 다시 그립니다 (뷰·테마 변경 시) */
+  /** 폴백 지도를 다시 그립니다 (뷰·테마 변경 시) */
   const renderStatic = useCallback(() => {
     const stage = stageRef.current;
     const controller = controllerRef.current;
     if (!stage || !controller) return;
-    darkRef.current = prefersDark();
     paletteRef.current = readOverlayPalette(stage);
     controller.redraw(readMapPalette(stage));
-    drawDots();
-  }, [drawDots]);
+  }, []);
 
   /* ── 블러 제어 ────────────────────────────────────── */
 
@@ -238,7 +194,6 @@ export default function MapStage(props: MapStageProps) {
     renderStatic();
 
     const unsubscribe = controller.subscribe(() => {
-      drawDots();
       if (controller.kind === "canvas") {
         const s = stageRef.current;
         if (s) controller.redraw(readMapPalette(s));
@@ -260,12 +215,7 @@ export default function MapStage(props: MapStageProps) {
       observer.disconnect();
       media.removeEventListener("change", onTheme);
     };
-  }, [ready, renderStatic, drawDots]);
-
-  /** 후보가 갱신되면 점만 다시 */
-  useEffect(() => {
-    if (ready) drawDots();
-  }, [ready, props.candidates, drawDots]);
+  }, [ready, renderStatic]);
 
   /** 기준점·반경이 바뀌면 화면을 다시 맞춥니다 (좌표값 기준 — 객체 신원 무시) */
   const baseLat = props.base?.lat;
@@ -398,7 +348,7 @@ export default function MapStage(props: MapStageProps) {
       planThrow(
         base,
         radiusM,
-        { power: 0.55 + Math.random() * 0.4, bearingRad: Math.random() * Math.PI * 2 },
+        { power: 0.3 + Math.random() * 0.65, bearingRad: Math.random() * Math.PI * 2 },
         Math.random,
       ),
     );
@@ -697,7 +647,6 @@ export default function MapStage(props: MapStageProps) {
           className="map-fill"
           style={{ display: usingFallback ? "block" : "none" }}
         />
-        <canvas ref={dotsRef} className="map-fill" />
       </div>
 
       <canvas

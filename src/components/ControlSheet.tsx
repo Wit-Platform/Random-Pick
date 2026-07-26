@@ -9,8 +9,6 @@ import type { CategoryId, Phase } from "@/lib/types";
 export interface ControlSheetProps {
   radiusM: number;
   cats: CategoryId[];
-  candidateCount: number;
-  loading: boolean;
   placeMode: boolean;
   geoDenied: boolean;
   locating: boolean;
@@ -23,16 +21,7 @@ export interface ControlSheetProps {
 }
 
 export default function ControlSheet(props: ControlSheetProps) {
-  const {
-    radiusM,
-    cats,
-    candidateCount,
-    loading,
-    placeMode,
-    geoDenied,
-    locating,
-    phase,
-  } = props;
+  const { radiusM, cats, placeMode, geoDenied, locating, phase } = props;
 
   const dark = typeof window !== "undefined" ? prefersDark() : false;
   const noCats = cats.length === 0;
@@ -73,9 +62,9 @@ export default function ControlSheet(props: ControlSheetProps) {
 
       <div className="group">
         <div className="group-head">
-          <span className="label">반경</span>
+          <span className="label">던지는 거리</span>
           <span className="value">
-            {formatDistance(radiusM)} · 도보 {walkMinutes(radiusM)}분
+            최대 {formatDistance(radiusM)} · 도보 {walkMinutes(radiusM)}분
           </span>
         </div>
         <input
@@ -99,9 +88,7 @@ export default function ControlSheet(props: ControlSheetProps) {
       <div className="group">
         <div className="group-head">
           <span className="label">음식 종류</span>
-          <span className="value">
-            {loading ? "…" : `후보 ${candidateCount}곳`}
-          </span>
+          <span className="value">{cats.length}종</span>
         </div>
         <div className="row">
           {CATEGORIES.map((cat) => {
@@ -125,14 +112,7 @@ export default function ControlSheet(props: ControlSheetProps) {
             );
           })}
         </div>
-        {noCats ? (
-          <p className="hint warn">한 종류는 골라주세요.</p>
-        ) : !loading && candidateCount === 0 ? (
-          <p className="hint warn">
-            반경 안에 조건에 맞는 곳이 없습니다. 반경을 넓히거나 종류를 더
-            골라주세요.
-          </p>
-        ) : null}
+        {noCats ? <p className="hint warn">한 종류는 골라주세요.</p> : null}
       </div>
 
       {/* 드래그를 못 하는 환경(키보드·스크린리더)을 위한 대체 수단 */}

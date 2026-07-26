@@ -8,7 +8,6 @@ import {
   DEFAULT_BASE,
   GROUP,
   PHYSICS,
-  PREVIEW_LIMIT,
   RADIUS,
 } from "@/lib/config";
 import { distanceM } from "@/lib/geo";
@@ -44,11 +43,9 @@ interface State {
   radiusM: number;
   cats: CategoryId[];
   placeMode: boolean;
-  candidates: Place[];
-  source: DataSource;
+  /** 던져보기 전에는 데이터 출처를 모릅니다 — 미리 조회하지 않기 때문입니다 */
+  source: DataSource | null;
   sampleReason?: SampleReason;
-  truncated: boolean;
-  loading: boolean;
   /** 429 등 일시적 안내. 다음 성공 응답에서 사라집니다 */
   notice: string | null;
   locating: boolean;
@@ -78,19 +75,15 @@ type Action =
   | { type: "widenRadius" }
   | { type: "toggleCat"; id: CategoryId }
   | { type: "togglePlaceMode" }
-  | { type: "loading"; on: boolean }
-  | {
-      type: "candidates";
-      places: Place[];
-      source: DataSource;
-      truncated: boolean;
-      reason?: SampleReason;
-    }
-  | { type: "clearCandidates" }
   | { type: "notice"; text: string | null }
   | { type: "throwStart" }
   | { type: "landed"; landing: LatLng }
-  | { type: "reveal"; winner: Place | null }
+  | {
+      type: "reveal";
+      winner: Place | null;
+      source: DataSource | null;
+      reason?: SampleReason;
+    }
   | { type: "showResult" }
   | { type: "again" }
   | { type: "decide" }
@@ -109,10 +102,7 @@ const initialState: State = {
   radiusM: RADIUS.default,
   cats: [...ALL_CATEGORY_IDS],
   placeMode: false,
-  candidates: [],
-  source: "sample",
-  truncated: false,
-  loading: false,
+  source: null,
   notice: null,
   locating: true,
   geoDenied: false,
@@ -181,25 +171,8 @@ function reducer(state: State, action: Action): State {
     case "togglePlaceMode":
       return { ...state, placeMode: !state.placeMode };
 
-    case "loading":
-      return { ...state, loading: action.on };
-
-    case "candidates":
-      return {
-        ...state,
-        candidates: action.places,
-        source: action.source,
-        sampleReason: action.reason,
-        truncated: action.truncated,
-        loading: false,
-        notice: null,
-      };
-
-    case "clearCandidates":
-      return { ...state, candidates: [], loading: false, truncated: false };
-
     case "notice":
-      return { ...state, notice: action.text, loading: false };
+      return { ...state, notice: action.text };
 
     case "throwStart":
       return {
@@ -222,6 +195,9 @@ function reducer(state: State, action: Action): State {
         ...state,
         resolving: false,
         winner,
+        source: action.source ?? state.source,
+        sampleReason: action.reason ?? state.sampleReason,
+        notice: action.source ? null : state.notice,
         distFromBase: winner ? distanceM(state.base, winner) : 0,
         distFromLanding: winner && landing ? distanceM(landing, winner) : 0,
         missStreak: winner ? 0 : state.missStreak + 1,
@@ -339,75 +315,35 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
     locate();
   }, [locate]);
 
-  /* 조건이 바뀌면 후보를 다시 불러옵니다 */
   const { base, radiusM, cats } = state;
+
+  /**
+   * 착지 후 판정. **던지기 전에는 아무것도 조회하지 않습니다.**
+   *
+   * 예전에는 기준점 반경 내 후보를 미리 받아두고, 당첨자도 "기준점 반경 안"이어야
+   * 한다는 조건을 걸었습니다. 그런데 던지기는 반경의 1.3배까지 날아가므로 멀리 던지면
+   * 돌 바로 옆에 식당이 있어도 그 필터에 걸려 허탕이 됐습니다. 실측에서 착지점 1008m,
+   * 당첨 매장 995m로 간신히 통과하는 경우까지 나왔습니다.
+   *
+   * 이제 판정 기준은 하나입니다 — **돌이 떨어진 자리에서 가장 가까운 곳.**
+   * 반경 슬라이더는 "얼마나 멀리까지 날아가는가"를 정하고, 허탕은 착지점 주변이
+   * 실제로 비어 있을 때만 납니다. 카카오 호출도 던지기당 1회로 줄어듭니다.
+   */
+  const { resolving, landing } = state;
   useEffect(() => {
+    if (!resolving || !landing) return;
     if (cats.length === 0) {
-      dispatch({ type: "clearCandidates" });
+      dispatch({ type: "reveal", winner: null, source: null });
       return;
     }
 
     const abort = new AbortController();
-    const timer = window.setTimeout(() => {
-      dispatch({ type: "loading", on: true });
-      const params = new URLSearchParams({
-        lat: String(base.lat),
-        lng: String(base.lng),
-        radius: String(radiusM),
-        cats: cats.join(","),
-        limit: String(PREVIEW_LIMIT),
-      });
-
-      fetch(`/api/places?${params}`, { signal: abort.signal })
-        .then(async (res) => {
-          if (res.status === 429) {
-            dispatch({
-              type: "notice",
-              text: "요청이 몰려 잠시 쉬는 중입니다. 곧 다시 시도합니다.",
-            });
-            return null;
-          }
-          if (!res.ok) throw new Error(String(res.status));
-          return (await res.json()) as {
-            places: Place[];
-            source: DataSource;
-            truncated: boolean;
-            reason?: SampleReason;
-          };
-        })
-        .then((data) => {
-          if (!data) return;
-          dispatch({
-            type: "candidates",
-            places: data.places,
-            source: data.source,
-            truncated: data.truncated,
-            reason: data.reason,
-          });
-        })
-        .catch(() => {
-          if (!abort.signal.aborted) dispatch({ type: "loading", on: false });
-        });
-    }, 260);
-
-    return () => {
-      abort.abort();
-      window.clearTimeout(timer);
-    };
-  }, [base, radiusM, cats]);
-
-  /* 착지 후 판정 — 착지점 반경 내에서, 기준점 반경도 만족하는 최근접 한 곳 */
-  const { resolving, landing } = state;
-  useEffect(() => {
-    if (!resolving || !landing) return;
-    const abort = new AbortController();
-
     const params = new URLSearchParams({
       lat: String(landing.lat),
       lng: String(landing.lng),
       radius: String(Math.round(revealRadiusM(radiusM))),
       cats: cats.join(","),
-      limit: "8",
+      limit: "1",
     });
 
     fetch(`/api/places?${params}`, { signal: abort.signal })
@@ -419,21 +355,32 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
           });
           return null;
         }
-        return res.ok ? ((await res.json()) as { places: Place[] }) : null;
+        return res.ok
+          ? ((await res.json()) as {
+              places: Place[];
+              source: DataSource;
+              reason?: SampleReason;
+            })
+          : null;
       })
       .then((data) => {
         if (abort.signal.aborted) return;
-        const winner =
-          data?.places.find((p) => distanceM(base, p) <= radiusM) ?? null;
-        dispatch({ type: "reveal", winner });
+        dispatch({
+          type: "reveal",
+          winner: data?.places[0] ?? null,
+          source: data?.source ?? null,
+          reason: data?.reason,
+        });
       })
       .catch(() => {
         // 조회 실패는 허탕으로 처리합니다 — 에러로 게임을 막지 않습니다
-        if (!abort.signal.aborted) dispatch({ type: "reveal", winner: null });
+        if (!abort.signal.aborted) {
+          dispatch({ type: "reveal", winner: null, source: null });
+        }
       });
 
     return () => abort.abort();
-  }, [resolving, landing, base, radiusM, cats]);
+  }, [resolving, landing, radiusM, cats]);
 
   /* 핀이 꽂히고 잠깐 뒤에 결과 카드를 올립니다 */
   useEffect(() => {
@@ -633,7 +580,6 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
             jsKey={jsKey}
             base={state.base}
             radiusM={state.radiusM}
-            candidates={state.candidates}
             phase={state.phase}
             placeMode={state.placeMode}
             winner={state.winner}
@@ -674,7 +620,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
             winner={state.winner}
             distFromBase={state.distFromBase}
             distFromLanding={state.distFromLanding}
-            source={state.source}
+            source={state.source ?? "sample"}
             decided={state.decided}
             missStreak={state.missStreak}
             onAgain={() => dispatch({ type: "again" })}
@@ -687,8 +633,6 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
         <ControlSheet
           radiusM={state.radiusM}
           cats={state.cats}
-          candidateCount={state.candidates.length}
-          loading={state.loading}
           placeMode={state.placeMode}
           geoDenied={state.geoDenied}
           locating={state.locating}
