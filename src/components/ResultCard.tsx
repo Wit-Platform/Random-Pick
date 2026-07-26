@@ -24,9 +24,18 @@ export default function ResultCard(props: ResultCardProps) {
   const { winner, source, decided, missStreak, shared } = props;
   const headingRef = useRef<HTMLParagraphElement | null>(null);
 
-  // 결과가 나오면 스크린리더가 읽고 키보드 포커스가 여기로 옵니다
+  /**
+   * 결과가 나오면 스크린리더가 읽고 키보드 포커스가 여기로 옵니다.
+   *
+   * 카드는 스크롤되는 패널의 **맨 위**에 삽입되므로, 사용자가 아래쪽(종류·그룹)을
+   * 보고 있었다면 카드가 시야 밖에 생깁니다. 결과가 안 뜬 것처럼 보이므로
+   * 명시적으로 스크롤해서 올립니다.
+   */
   useEffect(() => {
-    headingRef.current?.focus();
+    const el = headingRef.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: "nearest" });
   }, [winner]);
 
   if (!winner) {
