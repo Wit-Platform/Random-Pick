@@ -65,6 +65,17 @@ npm run preflight   # 환경변수 조합이 어떤 동작을 만드는지 확�
 키 없이 배포해도 샘플 모드로 정상 동작합니다. GitHub 연동(Vercel 대시보드 → Add New →
 Project → 이 레포 import)이 편합니다. 빌드 설정은 건드릴 것이 없습니다.
 
+> **Production Branch에 코드가 있는지 먼저 확인하세요.** 코드가 아직 feature 브랜치에만
+> 있는 상태에서 Production Branch를 `main`으로 두면, Vercel이 `package.json`도 없는 커밋을
+> 빌드해서 **산출물 없는 배포**를 만듭니다. 결과는 모든 경로에서 404입니다.
+>
+> **빌드 시간이 1~2초면 빌드가 안 돌았다는 신호입니다.** 이 프로젝트의 정상 빌드는
+> 10초 이상 걸립니다. Deployments의 Duration 열을 먼저 보세요.
+>
+> **Redeploy는 최신 코드를 배포하지 않습니다** — 그 배포와 **같은 커밋**을 다시 배포합니다.
+> 머지한 뒤에는 Redeploy로 해결되지 않고, `main`에 **새 커밋을 푸시**해야 현재 코드가
+> 배포됩니다.
+
 배포되면 도메인이 세 종류 생깁니다.
 
 | 종류 | 형태 | 안정성 |
@@ -72,6 +83,14 @@ Project → 이 레포 import)이 편합니다. 빌드 설정은 건드릴 것�
 | 프로덕션 | `<project>.vercel.app` | 고정 |
 | 브랜치 별칭 | `<project>-git-<branch>-<scope>.vercel.app` | 브랜치당 고정 |
 | 배포별 URL | `<project>-<hash>-<scope>.vercel.app` | **커밋마다 바뀜** |
+
+`<project>.vercel.app`은 **Vercel 전체에서 전역 고유**입니다. 이름이 이미 쓰이고 있으면
+다른 도메인이 배정되므로, 추측하지 말고 프로젝트 Overview나 `npx vercel inspect <배포 URL>`로
+실제 값을 확인하세요.
+
+Deployment Protection(Vercel Authentication)이 켜져 있으면 **Vercel 로그인한 사람만** 접속할
+수 있어 초대 링크 공유가 무의미해집니다. 공개할 앱이면 `Settings → Deployment Protection`에서
+끄세요.
 
 > **카카오 사이트 도메인은 와일드카드를 지원하지 않습니다.** `*.vercel.app`을 등록할 수
 > 없으므로 **프로덕션 도메인과 브랜치 별칭을 각각 등록**하세요. 커밋별 preview URL에서는
