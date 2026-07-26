@@ -54,12 +54,28 @@ export default function GroupPanel(props: GroupPanelProps) {
   }
 
   return (
-    <div className="group">
-      <div className="group-head">
-        <span className="label">그룹</span>
-        {code ? <span className="value">{feed.length}개 결과</span> : null}
-      </div>
+    // 컨트롤이 쌓이면 그룹 섹션이 패널 스크롤 아래로 묻혀서 없는 기능처럼 보입니다.
+    // 접어두면 한 줄로 줄어들어 스크롤 없이도 눈에 들어옵니다.
+    <details className="group-disclosure" open={code ? true : undefined}>
+      <summary className="group-toggle">
+        <span>
+          {code ? (
+            <>
+              그룹 <b className="group-toggle-code">{code}</b>
+            </>
+          ) : (
+            "그룹으로 같이 던지기"
+          )}
+        </span>
+        <span className="group-toggle-meta">
+          {code ? `${feed.length}개 결과` : "방 만들기 · 참가"}
+          <span className="chev" aria-hidden="true">
+            ›
+          </span>
+        </span>
+      </summary>
 
+      <div className="group-body">
       <label className="field">
         <span className="field-label">닉네임</span>
         <input
@@ -167,6 +183,7 @@ export default function GroupPanel(props: GroupPanelProps) {
       )}
 
       {error ? <p className="hint warn">{error}</p> : null}
-    </div>
+      </div>
+    </details>
   );
 }

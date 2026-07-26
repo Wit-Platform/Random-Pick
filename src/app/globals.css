@@ -185,7 +185,7 @@ button {
   flex: none;
   background: var(--surface);
   overflow-y: auto;
-  max-height: 48dvh;
+  max-height: 56dvh;
   padding: 8px 18px 22px;
   display: flex;
   flex-direction: column;
@@ -523,6 +523,81 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ── 그룹 ─────────────────────────────────────────────── */
+
+.group-disclosure {
+  margin-top: -4px;
+}
+
+.group-toggle {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  transition:
+    border-color 130ms ease,
+    color 130ms ease;
+}
+
+.group-toggle::-webkit-details-marker,
+.group-toggle::marker {
+  display: none;
+  content: "";
+}
+
+.group-toggle:hover {
+  border-color: var(--water);
+  color: var(--water);
+}
+
+.group-toggle-code {
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  color: var(--water);
+  font-weight: 700;
+}
+
+.group-toggle-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.chev {
+  display: inline-block;
+  font-size: 16px;
+  line-height: 1;
+  transition: transform 150ms ease;
+}
+
+.group-disclosure[open] .group-toggle {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.group-disclosure[open] .chev {
+  transform: rotate(90deg);
+}
+
+.group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line-2);
+  border-top: none;
+  border-radius: 0 0 var(--r-md) var(--r-md);
+}
 
 .field {
   display: flex;

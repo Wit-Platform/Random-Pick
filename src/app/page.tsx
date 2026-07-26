@@ -3,6 +3,16 @@ import { SITE } from "@/lib/site";
 import { groupPlayAvailable } from "@/lib/store";
 
 /**
+ * 정적 프리렌더를 끕니다.
+ *
+ * 프리렌더하면 `groupPlayAvailable()`이 **빌드 시점에** 평가됩니다. Upstash를
+ * 나중에 연결하면 API는 살아나는데 화면에서는 그룹 UI가 계속 숨어 있어서
+ * "서버는 되는데 UI가 없다"는 상태가 됩니다. 요청 시점에 판단하게 둡니다.
+ * (`NEXT_PUBLIC_KAKAO_JS_KEY`는 번들에 구워지므로 여전히 재배포가 필요합니다)
+ */
+export const dynamic = "force-dynamic";
+
+/**
  * 서버에서 환경 설정만 읽어 넘깁니다. REST 키·Upstash 토큰은 여기서도
  * 클라이언트로 나가지 않고, "있다/없다"만 불리언으로 전달합니다.
  */
