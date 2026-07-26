@@ -115,7 +115,11 @@ body {
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  /* keep-all은 한글 단어 중간을 끊지 않지만, 공백 없는 긴 상호명
+     ("포490베트남쌀국수강남점")은 컨테이너를 넘칩니다. anywhere를 함께 주면
+     넘칠 때만 마지막 수단으로 끊습니다. */
   word-break: keep-all;
+  overflow-wrap: anywhere;
   overscroll-behavior: none;
 }
 
@@ -724,11 +728,14 @@ input[type="text"]:focus-visible {
 }
 
 .result-name {
-  font-size: 24px;
+  /* 상호명은 길이 편차가 큽니다. 좁은 화면에서는 줄여서 두 줄에 담습니다 */
+  font-size: clamp(19px, 5.4vw, 24px);
   font-weight: 800;
   letter-spacing: -0.04em;
-  line-height: 1.18;
+  line-height: 1.22;
   text-wrap: balance;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .result-meta {
@@ -737,6 +744,13 @@ input[type="text"]:focus-visible {
   gap: 4px 14px;
   font-size: 12.5px;
   color: var(--ink-2);
+  min-width: 0;
+}
+
+/* flex 자식은 기본 min-width가 auto라서 줄어들지 못하고 넘칩니다 */
+.result-meta > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .result-meta .k {
@@ -766,10 +780,17 @@ input[type="text"]:focus-visible {
 .feed-item {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 10px;
   font-size: 13px;
   padding: 6px 0;
   border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.feed-item > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .feed-item:last-child {
