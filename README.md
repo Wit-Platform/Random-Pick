@@ -268,7 +268,7 @@ src/
 | `WATER.aimLevel` | 0.66 | 조준 중 수면 농도. 높이면 후보 점이 안 보임 |
 | `WATER.easeRise` / `easeFall` | 0.19 / 0.07 | 물이 차는 속도 / 빠지는 속도 |
 | `RADIUS.min` / `step` | 50m / 50m | 던지는 거리 하한 |
-| `useBottomSheet` `SNAP_SMALL` / `SNAP_LARGE` | 44% / 76% | 모바일 시트 두 높이 |
+| `useBottomSheet` `SNAPS` | 10% / 44% / 76% | 모바일 시트 세 높이 |
 | `REVEAL.minM` | 40m | 판정 반경 하한. **던지는 거리보다 크면 안 됩니다** |
 
 **판정 반경 하한을 40m로 정한 근거** — 강남역에서 반경 50m로 16번 던져 착지점에서 가장

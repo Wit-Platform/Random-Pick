@@ -225,7 +225,12 @@ button {
   align-self: stretch;
   display: grid;
   place-items: center;
-  padding: 10px 0 6px;
+  /**
+   * 손잡이는 시트 맨 위 끝이라 정확히 눌러야 합니다. 세로 20px로는 잡히지 않아
+   * 권장 최소 크기(44px)까지 넓혔습니다. 좌우도 패널 패딩을 넘겨 전체 폭을 씁니다.
+   */
+  min-height: 44px;
+  padding: 0;
   margin: 0 -18px;
   border: 0;
   background: transparent;
@@ -240,8 +245,8 @@ button {
 
 .sheet-grip {
   display: block;
-  width: 38px;
-  height: 4px;
+  width: 48px;
+  height: 5px;
   border-radius: var(--r-pill);
   background: var(--line-2);
   transition: background 130ms ease;

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useState } from "react";
 
-import { useBottomSheet } from "@/hooks/useBottomSheet";
+import { SNAP_DEFAULT, useBottomSheet } from "@/hooks/useBottomSheet";
 import { useGroupFeed } from "@/hooks/useGroupFeed";
 import { ALL_CATEGORY_IDS } from "@/lib/categories";
 import {
@@ -333,6 +333,7 @@ function sampleBannerText(
 
 export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const sheet = useBottomSheet();
   // 처음 방문이면 사용법을 한 번 보여줍니다. 서버 렌더와 어긋나지 않도록
   // 마운트 후에 판단합니다.
   const [guideOpen, setGuideOpen] = useState(false);
@@ -448,6 +449,15 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
     return () => abort.abort();
   }, [resolving, landing, base, radiusM, cats]);
 
+  /**
+   * 시트를 접어두고 던졌으면 결과 카드가 가려집니다. 결과가 뜨는 순간
+   * 최소 "보통" 높이까지 올립니다 (이미 더 올려져 있으면 그대로).
+   */
+  const raiseSheet = sheet.raiseAtLeast;
+  useEffect(() => {
+    if (state.phase === "result") raiseSheet(SNAP_DEFAULT);
+  }, [state.phase, raiseSheet]);
+
   /* 핀이 꽂히고 잠깐 뒤에 결과 카드를 올립니다 */
   useEffect(() => {
     if (state.phase !== "reveal" || state.resolving) return;
@@ -476,7 +486,6 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
   /* ── 그룹 ────────────────────────────────────────────── */
 
   const groupFeed = useGroupFeed(state.groupCode, state.nick);
-  const sheet = useBottomSheet();
 
   /** 닉네임만 브라우저에 남깁니다. 좌표나 결과는 저장하지 않습니다. */
   useEffect(() => {
@@ -730,12 +739,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
 
       <aside className="panel" ref={sheet.panelRef}>
         {/* 손잡이는 실제로 끌립니다. 탭하면 두 높이를 오갑니다 */}
-        <button
-          type="button"
-          className="sheet-handle"
-          aria-label={sheet.expanded ? "시트 내리기" : "시트 올리기"}
-          {...sheet.handleProps}
-        >
+        <button type="button" className="sheet-handle" {...sheet.handleProps}>
           <span className="sheet-grip" aria-hidden="true" />
         </button>
 

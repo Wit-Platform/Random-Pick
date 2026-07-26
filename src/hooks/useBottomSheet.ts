@@ -11,63 +11,88 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * 데스크톱(≥940px)에서는 패널이 전체 높이를 쓰므로 아무 것도 하지 않습니다.
  */
 
-/** 화면 높이에 대한 비율 */
-const SNAP_SMALL = 0.44;
-const SNAP_LARGE = 0.76;
-/** 끌 수 있는 범위. 지도가 완전히 사라지지 않게 상한을 둡니다 */
-const MIN_RATIO = 0.24;
-const MAX_RATIO = 0.8;
+/**
+ * 화면 높이에 대한 비율. 세 단계입니다.
+ *   0 접음  — 손잡이만. 지도를 거의 전체로 씁니다
+ *   1 기본  — 주요 컨트롤이 보입니다
+ *   2 펼침  — 그룹·피드백까지 봅니다
+ */
+const SNAPS = [0.1, 0.44, 0.76] as const;
+export const SNAP_PEEK = 0;
+export const SNAP_DEFAULT = 1;
+export const SNAP_FULL = 2;
+
+/** 끌 수 있는 범위 */
+const MIN_RATIO = 0.08;
+const MAX_RATIO = 0.82;
 /** 이보다 적게 움직였으면 탭으로 봅니다 */
 const TAP_SLOP_PX = 6;
 const DESKTOP_QUERY = "(min-width: 940px)";
 
+const LABELS = ["접힘", "보통", "펼침"] as const;
+
 export interface BottomSheet {
   panelRef: React.RefObject<HTMLElement | null>;
-  expanded: boolean;
-  /** 손잡이에 그대로 펼쳐 넣습니다 */
+  snap: number;
   handleProps: {
     onPointerDown: (e: React.PointerEvent) => void;
     onKeyDown: (e: React.KeyboardEvent) => void;
-    "aria-expanded": boolean;
+    "aria-label": string;
   };
-  toggle: () => void;
+  /** 최소 이 단계까지는 올립니다. 결과 카드가 접힌 시트에 가려지지 않게 */
+  raiseAtLeast: (index: number) => void;
+}
+
+function nearestSnap(ratio: number): number {
+  let best = 0;
+  let bestGap = Infinity;
+  SNAPS.forEach((s, i) => {
+    const gap = Math.abs(s - ratio);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = i;
+    }
+  });
+  return best;
 }
 
 export function useBottomSheet(): BottomSheet {
   const panelRef = useRef<HTMLElement | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [snap, setSnap] = useState<number>(SNAP_DEFAULT);
   const dragRef = useRef<{ startY: number; startH: number; moved: number } | null>(
     null,
   );
+
   /**
-   * 포인터 핸들러가 최신 상태를 읽되, setState 업데이터 안에서 부수효과를 부르지
-   * 않도록 ref로 미러링합니다. 업데이터 안에서 settle을 호출하면 StrictMode에서
-   * 업데이터가 두 번 실행되며 높이 적용이 어긋나 두 번째 탭이 먹지 않았습니다.
+   * 포인터 핸들러가 최신 값을 읽되, setState 업데이터 안에서 부수효과를 부르지
+   * 않도록 ref로 미러링합니다 — StrictMode에서 업데이터는 두 번 실행됩니다.
    */
-  const expandedRef = useRef(expanded);
+  const snapRef = useRef(snap);
   useEffect(() => {
-    expandedRef.current = expanded;
-  }, [expanded]);
+    snapRef.current = snap;
+  }, [snap]);
 
   const isDesktop = useCallback(
     () => typeof window !== "undefined" && window.matchMedia(DESKTOP_QUERY).matches,
     [],
   );
 
-  /** 스냅 위치로 되돌립니다. dvh로 두면 화면 회전에도 비율이 유지됩니다 */
-  const settle = useCallback((next: boolean) => {
+  /** dvh로 두면 화면 회전에도 비율이 유지됩니다 */
+  const settle = useCallback((index: number) => {
     const el = panelRef.current;
     if (!el) return;
     el.style.transition = "height 220ms cubic-bezier(0.2, 0.9, 0.3, 1)";
-    el.style.height = `${(next ? SNAP_LARGE : SNAP_SMALL) * 100}dvh`;
+    el.style.height = `${(SNAPS[index] ?? SNAPS[SNAP_DEFAULT]) * 100}dvh`;
   }, []);
 
   useEffect(() => {
     if (isDesktop()) return;
-    settle(expanded);
-  }, [expanded, settle, isDesktop]);
+    settle(snap);
+  }, [snap, settle, isDesktop]);
 
-  const toggle = useCallback(() => setExpanded((v) => !v), []);
+  const raiseAtLeast = useCallback((index: number) => {
+    setSnap((current) => (current < index ? index : current));
+  }, []);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -75,8 +100,11 @@ export function useBottomSheet(): BottomSheet {
       if (!el || isDesktop()) return;
 
       e.preventDefault();
-      const startH = el.getBoundingClientRect().height;
-      dragRef.current = { startY: e.clientY, startH, moved: 0 };
+      dragRef.current = {
+        startY: e.clientY,
+        startH: el.getBoundingClientRect().height,
+        moved: 0,
+      };
       el.style.transition = "none";
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
 
@@ -100,18 +128,17 @@ export function useBottomSheet(): BottomSheet {
         window.removeEventListener("pointercancel", onUp);
         if (!drag) return;
 
-        // 거의 안 움직였으면 탭 — 두 상태를 오갑니다
+        // 거의 안 움직였으면 탭 — 세 단계를 순환합니다
         if (drag.moved < TAP_SLOP_PX) {
-          const next = !expandedRef.current;
-          setExpanded(next);
+          const next = (snapRef.current + 1) % SNAPS.length;
+          setSnap(next);
           settle(next);
           return;
         }
 
-        // 가까운 스냅으로
         const ratio = el.getBoundingClientRect().height / window.innerHeight;
-        const next = ratio > (SNAP_SMALL + SNAP_LARGE) / 2;
-        setExpanded(next);
+        const next = nearestSnap(ratio);
+        setSnap(next);
         settle(next);
       };
 
@@ -122,26 +149,28 @@ export function useBottomSheet(): BottomSheet {
     [isDesktop, settle],
   );
 
-  const onKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setExpanded(true);
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setExpanded(false);
-      } else if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        toggle();
-      }
-    },
-    [toggle],
-  );
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // 키보드는 순환하지 않고 한 단계씩 — 예측 가능해야 합니다
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSnap((v) => Math.min(SNAPS.length - 1, v + 1));
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSnap((v) => Math.max(0, v - 1));
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setSnap((v) => (v + 1) % SNAPS.length);
+    }
+  }, []);
 
   return {
     panelRef,
-    expanded,
-    handleProps: { onPointerDown, onKeyDown, "aria-expanded": expanded },
-    toggle,
+    snap,
+    handleProps: {
+      onPointerDown,
+      onKeyDown,
+      "aria-label": `시트 높이 (현재 ${LABELS[snap] ?? "보통"}) — 끌거나 눌러서 조절`,
+    },
+    raiseAtLeast,
   };
 }
