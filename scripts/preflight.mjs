@@ -55,12 +55,26 @@ if (has("REDIS_URL") && !upstash) {
 }
 console.log(`  ${budget ? "설정됨" : "기본값"}  KAKAO_DAILY_BUDGET${budget ? ` (${budget})` : " (8000)"}`);
 
+const resend = has("RESEND_API_KEY");
+console.log(`  ${mark(resend)}  RESEND_API_KEY (개발자에게 한마디 메일 발송)`);
+if (resend && !has("FEEDBACK_FROM")) {
+  console.log(
+    "          FEEDBACK_FROM 미설정 → onboarding@resend.dev 로 발송합니다.",
+  );
+  console.log(
+    "          이 발신자는 Resend 계정 소유자 본인 주소로만 갑니다 (도메인 인증 시 해제).",
+  );
+}
+
 console.log("\n이 설정으로 배포하면");
 console.log(`  지도      ${jsKey ? "카카오맵 타일" : "절차적 캔버스 지도 (샘플)"}`);
 console.log(`  식당      ${restKey ? "카카오 로컬 API" : "좌표 시드 샘플 데이터"}`);
 console.log(`  POI 캐시  ${upstash ? "Upstash Redis (인스턴스 공유)" : "프로세스 메모리 (인스턴스별)"}`);
 console.log(`  Rate limit ${upstash ? "전역" : "인스턴스별 — 서버리스에서 사실상 무력"}`);
 console.log(`  그룹      ${upstash ? "동작" : memGroup ? "메모리 (로컬 전용)" : "숨김"}`);
+console.log(
+  `  한마디    ${resend ? "메일 발송 + Upstash 30일 보관" : "Upstash에만 보관 (lunch:feedback)"}`,
+);
 
 const warnings = [];
 const errors = [];

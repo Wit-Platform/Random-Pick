@@ -245,6 +245,20 @@ export function createCanvasController(
       return () => listeners.delete(listener);
     },
 
+    onClick(listener: (at: LatLng) => void) {
+      const handler = (event: MouseEvent) => {
+        const rect = canvas.getBoundingClientRect();
+        listener(
+          controller.unproject({
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top,
+          }),
+        );
+      };
+      canvas.addEventListener("click", handler);
+      return () => canvas.removeEventListener("click", handler);
+    },
+
     resize() {
       readSize();
       controller.redraw(palette ?? FALLBACK_PALETTE);

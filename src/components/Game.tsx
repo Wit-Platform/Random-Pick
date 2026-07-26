@@ -653,7 +653,9 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
           ) : null}
 
           {state.placeMode ? (
-            <p className="stage-hint">지도를 탭해서 기준점을 정하세요</p>
+            <p className="stage-hint">
+              지도를 옮기거나 확대한 뒤, 원하는 지점을 탭하세요
+            </p>
           ) : state.phase === "idle" ? (
             <p className="stage-hint">
               끌면 물이 차오릅니다. 당겼다 놓으면 돌이 날아갑니다

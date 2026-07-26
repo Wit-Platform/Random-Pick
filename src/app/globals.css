@@ -286,8 +286,16 @@ button {
   height: 100%;
 }
 
-.stage.place-mode .overlay {
+/**
+ * place mode에서는 지도가 제스처를 받아야 합니다.
+ * - 오버레이의 pointer-events는 컴포넌트에서 끕니다
+ * - touch-action: none은 조준 드래그가 스크롤로 가로채이지 않게 하려고 걸어둔 것이라,
+ *   지도를 끌어야 하는 이 모드에서는 풀어줍니다
+ * - 오버레이가 이벤트를 받지 않으므로 커서는 스테이지에 둡니다
+ */
+.stage.place-mode {
   cursor: crosshair;
+  touch-action: auto;
 }
 
 .stage-hint {

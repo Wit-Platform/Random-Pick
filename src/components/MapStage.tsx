@@ -228,11 +228,27 @@ export default function MapStage(props: MapStageProps) {
     renderStatic();
   }, [ready, baseLat, baseLng, props.radiusM, renderStatic]);
 
-  /** 비행 중에는 지도 조작을 잠급니다 */
+  /**
+   * 비행 중에만 지도 조작을 잠급니다.
+   *
+   * 예전에는 place mode에서도 잠갔는데, 기준점을 찍으려면 지도를 옮겨 보면서 찾아야
+   * 하므로 정확히 반대로 해야 합니다.
+   */
   useEffect(() => {
     if (!ready) return;
-    controllerRef.current?.setInteractive(props.phase === "idle" && !props.placeMode);
-  }, [ready, props.phase, props.placeMode]);
+    controllerRef.current?.setInteractive(props.phase !== "flying");
+  }, [ready, props.phase]);
+
+  /**
+   * place mode에서는 지도가 클릭을 처리합니다. 오버레이 캔버스는 pointer-events를
+   * 끄기 때문에(아래 JSX) 끌기·확대가 지도로 그대로 전달되고, 탭한 지점만 받아옵니다.
+   */
+  useEffect(() => {
+    if (!ready || !props.placeMode) return;
+    const controller = controllerRef.current;
+    if (!controller) return;
+    return controller.onClick((at) => propsRef.current.onPickBase(at));
+  }, [ready, props.placeMode]);
 
   /** 다시 던지기로 idle에 돌아오면 블러와 물보라를 초기화합니다 */
   useEffect(() => {
@@ -318,16 +334,10 @@ export default function MapStage(props: MapStageProps) {
   const onPointerUp = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       const controller = controllerRef.current;
-      const { phase, base, placeMode, radiusM } = propsRef.current;
+      const { phase, base, radiusM } = propsRef.current;
       const pt = localPoint(e);
 
       if (stageRef.current) delete stageRef.current.dataset.aiming;
-
-      if (placeMode) {
-        if (controller) propsRef.current.onPickBase(controller.unproject(pt));
-        aimRef.current.active = false;
-        return;
-      }
 
       if (!aimRef.current.active) return;
       aimRef.current.active = false;
@@ -655,6 +665,8 @@ export default function MapStage(props: MapStageProps) {
       <canvas
         ref={overlayRef}
         className="overlay"
+        // place mode에서는 지도가 제스처를 받아야 합니다
+        style={{ pointerEvents: props.placeMode ? "none" : "auto" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

@@ -34,6 +34,13 @@ export interface MapController {
   setInteractive(on: boolean): void;
   /** 뷰가 바뀔 때 호출됩니다. 해제 함수를 반환합니다 */
   subscribe(listener: () => void): () => void;
+  /**
+   * 지도 위 클릭. 기준점을 찍을 때 씁니다.
+   *
+   * 오버레이 캔버스로 좌표를 계산하지 않고 지도에게 맡깁니다 — 그래야 place mode에서도
+   * 지도를 끌어 옮기고 확대/축소한 다음 찍을 수 있습니다.
+   */
+  onClick(listener: (at: LatLng) => void): () => void;
   /** 컨테이너 크기 변경 반영 */
   resize(): void;
   /** 폴백 지도만 실제로 그립니다. 카카오는 no-op */

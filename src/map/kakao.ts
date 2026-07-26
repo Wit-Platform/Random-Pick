@@ -20,6 +20,10 @@ interface KakaoBounds {
   getNorthEast(): KakaoLatLng;
 }
 
+interface KakaoMouseEvent {
+  latLng?: KakaoLatLng;
+}
+
 interface KakaoMap {
   getCenter(): KakaoLatLng;
   setCenter(ll: KakaoLatLng): void;
@@ -38,8 +42,16 @@ interface KakaoMapsNamespace {
   ) => KakaoMap;
   LatLng: new (lat: number, lng: number) => KakaoLatLng;
   event: {
-    addListener(target: unknown, type: string, handler: () => void): void;
-    removeListener(target: unknown, type: string, handler: () => void): void;
+    addListener(
+      target: unknown,
+      type: string,
+      handler: (event?: KakaoMouseEvent) => void,
+    ): void;
+    removeListener(
+      target: unknown,
+      type: string,
+      handler: (event?: KakaoMouseEvent) => void,
+    ): void;
   };
   load(callback: () => void): void;
 }
@@ -198,6 +210,14 @@ export function createKakaoController(
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => listeners.delete(listener);
+    },
+    onClick(listener: (at: LatLng) => void) {
+      const handler = (event?: KakaoMouseEvent) => {
+        const ll = event?.latLng;
+        if (ll) listener({ lat: ll.getLat(), lng: ll.getLng() });
+      };
+      maps.event.addListener(map, "click", handler);
+      return () => maps.event.removeListener(map, "click", handler);
     },
     resize() {
       map.relayout();

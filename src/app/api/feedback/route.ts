@@ -44,8 +44,9 @@ export async function POST(request: Request): Promise<Response> {
   );
   if (!verdict.ok) return tooManyRequests(verdict);
 
+  let result: { stored: boolean; emailed: boolean };
   try {
-    await submitFeedback(parsed.value);
+    result = await submitFeedback(parsed.value);
   } catch {
     return Response.json(
       { error: "전송에 실패했습니다. 잠시 후 다시 시도해주세요." },
@@ -53,5 +54,16 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+  /**
+   * `emailed`를 응답에 담습니다.
+   *
+   * 보낸 사람에게는 어느 쪽이든 "접수됨"이 맞지만, 이게 없으면 **운영자가 메일 발송이
+   * 망가진 것을 알 방법이 없습니다** — 내용은 Redis에 조용히 쌓이기만 합니다.
+   * 설정 여부를 노출하는 것 외에 민감한 정보는 없고, 브라우저 네트워크 탭에서
+   * 바로 확인할 수 있게 하는 값이 훨씬 큽니다.
+   */
+  return Response.json(
+    { ok: true, ...result },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
