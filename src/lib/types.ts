@@ -53,24 +53,37 @@ export interface GroupCondition {
   radiusM: number;
   cats: CategoryId[];
   createdAt: number;
+  /** 방을 만든 브라우저. 잠그기 권한 판정에만 씁니다 (응답에서 제거) */
+  ownerId?: string;
+  /** 잠그면 새 참가를 막습니다. 이미 들어온 사람은 그대로 씁니다 */
+  locked?: boolean;
 }
 
 export interface GroupThrow {
-  /** 투표 대상을 지목하기 위한 식별자. 서버가 붙입니다 */
+  /** 투표·삭제 대상을 지목하기 위한 식별자. 서버가 붙입니다 */
   id: string;
   nick: string;
   placeName: string;
   cat: CategoryId;
   distM: number;
   ts: number;
+  /** 카카오맵 상세 링크. 샘플 데이터에는 없습니다 */
+  url?: string;
+  /**
+   * 올린 브라우저. 본인만 삭제할 수 있게 하려고 저장하며
+   * **응답에서는 제거하고 `mine` 불리언으로만 알려줍니다.**
+   */
+  ownerId?: string;
 }
 
 /** 붐업(찬성) / 붐따(반대) */
 export type VoteValue = "up" | "down";
 
-export interface GroupThrowWithVotes extends GroupThrow {
+export interface GroupThrowWithVotes extends Omit<GroupThrow, "ownerId"> {
   up: number;
   down: number;
   /** 이 브라우저가 던진 표. 없으면 null */
   myVote: VoteValue | null;
+  /** 이 브라우저가 올린 항목인지 — 삭제 버튼 노출 판단 */
+  mine: boolean;
 }

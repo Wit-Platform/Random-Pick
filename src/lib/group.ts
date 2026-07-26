@@ -111,11 +111,95 @@ export async function attachVotes(
     : [];
 
   return entries.map((entry, i) => ({
-    ...entry,
+    // ownerId를 떼고 mine 불리언으로만 내보냅니다
+    ...stripOwner(entry, voterId),
     up: Math.max(0, Number(counts[i * 2] ?? 0)),
     down: Math.max(0, Number(counts[i * 2 + 1] ?? 0)),
     myVote: (mine[i] as VoteValue | null) ?? null,
   }));
+}
+
+/* ── 참가자 (presence) ──────────────────────────────────── */
+
+/**
+ * 계정도 연결도 없으므로 참가자는 **하트비트**로 파악합니다. 각 브라우저가 피드를
+ * 폴링할 때 자기 닉네임을 함께 보내고, 이 시간 안에 소식이 없으면 목록에서 빠집니다.
+ * 폴링 간격(5초)의 몇 배로 잡아 일시적인 네트워크 끊김에 사라지지 않게 합니다.
+ */
+const PRESENCE_TTL_MS = 25_000;
+
+/**
+ * 참가자 목록은 JSON 한 덩이로 둡니다.
+ *
+ * 동시에 두 명이 하트비트를 보내면 한쪽이 유실될 수 있지만, 5초 뒤 다음 하트비트가
+ * 스스로 복구합니다. 투표와 달리 누적값이 아니라 **현재 상태**라서 이 방식이
+ * 안전합니다. (투표는 유실되면 영구적이므로 카운터를 따로 씁니다)
+ */
+function membersKey(code: string): string {
+  return `lunch:group:${code}:members`;
+}
+
+interface MemberRecord {
+  nick: string;
+  ts: number;
+}
+
+async function readMembers(
+  code: string,
+): Promise<Record<string, MemberRecord>> {
+  try {
+    const raw = await getStore().get(membersKey(code));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, MemberRecord>;
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function prune(members: Record<string, MemberRecord>): Record<string, MemberRecord> {
+  const cutoff = Date.now() - PRESENCE_TTL_MS;
+  const alive: Record<string, MemberRecord> = {};
+  for (const [id, m] of Object.entries(members)) {
+    if (m && typeof m.nick === "string" && m.ts > cutoff) alive[id] = m;
+  }
+  return alive;
+}
+
+/** 하트비트. 목록을 갱신하고 살아있는 참가자만 남깁니다. */
+export async function touchMember(
+  code: string,
+  voterId: string,
+  nick: string,
+): Promise<void> {
+  const members = prune(await readMembers(code));
+  members[voterId] = { nick, ts: Date.now() };
+  try {
+    await getStore().set(
+      membersKey(code),
+      JSON.stringify(members),
+      GROUP_TTL_SEC,
+    );
+  } catch {
+    // 다음 하트비트가 다시 시도합니다
+  }
+}
+
+export interface GroupMember {
+  nick: string;
+  /** 이 브라우저인지 — 목록에서 "나"로 표시합니다 */
+  self: boolean;
+}
+
+/** 지금 방에 있는 사람들. 들어온 순서대로 돌려줍니다. */
+export async function listMembers(
+  code: string,
+  selfId: string | null,
+): Promise<GroupMember[]> {
+  const members = prune(await readMembers(code));
+  return Object.entries(members)
+    .sort((a, b) => a[1].ts - b[1].ts)
+    .map(([id, m]) => ({ nick: m.nick, self: id === selfId }));
 }
 
 export async function saveCondition(
@@ -169,6 +253,89 @@ export async function loadThrows(code: string): Promise<GroupThrow[]> {
   return out;
 }
 
+/**
+ * 카카오맵 링크만 허용합니다.
+ *
+ * 이 값은 **다른 참가자 화면에 클릭 가능한 링크로 렌더됩니다.** 검증하지 않으면
+ * 누구나 임의의 주소를 방에 심을 수 있습니다(피싱·악성 링크). 호스트를 화이트리스트로
+ * 제한하고 https만 받습니다.
+ */
+const KAKAO_PLACE_HOSTS = new Set([
+  "place.map.kakao.com",
+  "map.kakao.com",
+  "m.place.map.kakao.com",
+  "m.map.kakao.com",
+]);
+
+export function sanitizePlaceUrl(input: unknown): string | null {
+  if (typeof input !== "string" || input.length > 300) return null;
+  try {
+    const url = new URL(input);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (!KAKAO_PLACE_HOSTS.has(url.hostname)) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** 응답에서 서버 전용 필드를 떼고 mine 플래그로 바꿉니다 */
+export function stripOwner(
+  entry: GroupThrow,
+  voterId: string | null,
+): Omit<GroupThrow, "ownerId"> & { mine: boolean } {
+  const { ownerId, ...rest } = entry;
+  return { ...rest, mine: Boolean(voterId && ownerId === voterId) };
+}
+
+/**
+ * 본인이 올린 항목만 지웁니다.
+ *
+ * 리스트에서 지우려면 저장된 문자열이 정확히 일치해야 하므로, 원본 문자열을 읽어
+ * 파싱해 대조한 뒤 그 문자열로 LREM 합니다. 투표 카운터도 함께 지웁니다.
+ * (누가 어떻게 투표했는지 기록한 키는 열거할 수 없어 12시간 만료에 맡깁니다)
+ */
+export async function deleteThrow(
+  code: string,
+  entryId: string,
+  voterId: string,
+): Promise<"deleted" | "forbidden" | "missing"> {
+  const store = getStore();
+  const key = throwsKey(code);
+  const raw = await store.lrange(key, 0, -1);
+
+  for (const line of raw) {
+    let parsed: GroupThrow;
+    try {
+      parsed = JSON.parse(line) as GroupThrow;
+    } catch {
+      continue;
+    }
+    if (parsed.id !== entryId) continue;
+    if (parsed.ownerId !== voterId) return "forbidden";
+
+    await store.lrem(key, line);
+    for (const v of ["up", "down"] as const) {
+      await store.del(voteCountKey(code, entryId, v));
+    }
+    return "deleted";
+  }
+  return "missing";
+}
+
+/** 방 잠그기 — 만든 사람만 바꿀 수 있습니다 */
+export async function setRoomLocked(
+  code: string,
+  voterId: string,
+  locked: boolean,
+): Promise<"ok" | "forbidden" | "missing"> {
+  const condition = await loadCondition(code);
+  if (!condition) return "missing";
+  if (!condition.ownerId || condition.ownerId !== voterId) return "forbidden";
+  await saveCondition(code, { ...condition, locked });
+  return "ok";
+}
+
 export function sanitizeNick(input: unknown): string | null {
   if (typeof input !== "string") return null;
   const nick = input.trim().slice(0, GROUP.maxNickLength);
@@ -197,5 +364,12 @@ export function parseCondition(body: unknown): GroupCondition | null {
   );
   if (cats.length === 0) return null;
 
-  return { base: { lat, lng }, radiusM, cats, createdAt: Date.now() };
+  return {
+    base: { lat, lng },
+    radiusM,
+    cats,
+    createdAt: Date.now(),
+    ownerId: sanitizeVoterId(b.voterId) ?? undefined,
+    locked: false,
+  };
 }

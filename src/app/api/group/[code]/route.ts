@@ -1,5 +1,5 @@
 import { RATE_LIMITS } from "@/lib/config";
-import { loadCondition } from "@/lib/group";
+import { loadCondition, sanitizeVoterId } from "@/lib/group";
 import {
   checkRateLimit,
   clientIdentity,
@@ -48,8 +48,26 @@ export async function GET(
     );
   }
 
+  /**
+   * 잠긴 방은 새 참가를 막습니다. 만든 사람은 다시 들어올 수 있어야 하므로
+   * (새로고침·딥링크 재진입) voter로 소유자를 확인해 통과시킵니다.
+   */
+  const voterId = sanitizeVoterId(
+    new URL(request.url).searchParams.get("voter"),
+  );
+  const isOwner = Boolean(condition.ownerId && condition.ownerId === voterId);
+  if (condition.locked && !isOwner) {
+    return Response.json(
+      { error: "이 방은 잠겨 있어 새로 들어갈 수 없습니다" },
+      { status: 403 },
+    );
+  }
+
+  // ownerId는 서버 전용입니다 — 대신 내가 방장인지만 알려줍니다
+  const safe = { ...condition };
+  delete safe.ownerId;
   return Response.json(
-    { code, condition },
+    { code, condition: safe, isOwner },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

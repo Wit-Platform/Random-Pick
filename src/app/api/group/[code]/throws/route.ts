@@ -4,10 +4,14 @@ import {
   appendThrow,
   attachVotes,
   loadCondition,
+  deleteThrow,
+  listMembers,
   loadThrows,
   newThrowId,
   sanitizeNick,
+  sanitizePlaceUrl,
   sanitizeVoterId,
+  touchMember,
 } from "@/lib/group";
 import {
   checkRateLimit,
@@ -69,13 +73,26 @@ export async function GET(
   );
   if (resolved instanceof Response) return resolved;
 
-  const voterId = sanitizeVoterId(
-    new URL(request.url).searchParams.get("voter"),
-  );
+  const params = new URL(request.url).searchParams;
+  const voterId = sanitizeVoterId(params.get("voter"));
+  const nick = sanitizeNick(params.get("nick"));
+
+  /**
+   * 하트비트를 이 GET에 얹습니다.
+   *
+   * 별도 엔드포인트를 두면 5초마다 요청이 두 배가 됩니다. 폴링하는 것 자체가
+   * "지금 방에 있다"는 신호이므로 같은 요청에 싣는 것이 자연스럽습니다.
+   * (`Cache-Control: no-store`라 중간 캐시가 이 부수효과를 삼키지 않습니다)
+   */
+  if (voterId && nick) await touchMember(resolved.code, voterId, nick);
+
   const entries = await loadThrows(resolved.code);
 
   return Response.json(
-    { throws: await attachVotes(resolved.code, entries, voterId) },
+    {
+      throws: await attachVotes(resolved.code, entries, voterId),
+      members: await listMembers(resolved.code, voterId),
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -118,6 +135,9 @@ export async function POST(
   const distRaw = Number(b.distM);
   const entry: GroupThrow = {
     id: newThrowId(),
+    // 다른 참가자 화면에 링크로 렌더되므로 카카오맵 주소만 통과시킵니다
+    url: sanitizePlaceUrl(b.url) ?? undefined,
+    ownerId: sanitizeVoterId(b.voterId) ?? undefined,
     nick,
     placeName: placeName.slice(0, 40),
     cat,
@@ -127,4 +147,44 @@ export async function POST(
 
   await appendThrow(resolved.code, entry);
   return Response.json({ ok: true, entry });
+}
+
+/** 본인이 올린 항목만 지웁니다 */
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ code: string }> },
+): Promise<Response> {
+  const resolved = await resolveCode(
+    request,
+    context,
+    RATE_LIMITS.groupWrite,
+    "group-write",
+  );
+  if (resolved instanceof Response) return resolved;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "본문을 읽을 수 없습니다" }, { status: 400 });
+  }
+
+  const b = (body ?? {}) as Record<string, unknown>;
+  const entryId = typeof b.entryId === "string" ? b.entryId.trim() : "";
+  const voterId = sanitizeVoterId(b.voterId);
+  if (!entryId || !voterId) {
+    return Response.json({ error: "잘못된 요청입니다" }, { status: 400 });
+  }
+
+  const result = await deleteThrow(resolved.code, entryId, voterId);
+  if (result === "forbidden") {
+    return Response.json(
+      { error: "본인이 올린 것만 지울 수 있습니다" },
+      { status: 403 },
+    );
+  }
+  if (result === "missing") {
+    return Response.json({ error: "이미 지워졌습니다" }, { status: 404 });
+  }
+  return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }

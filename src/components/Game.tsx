@@ -73,6 +73,9 @@ interface State {
   nick: string;
   groupBusy: boolean;
   groupError: string | null;
+  /** 방을 만든 브라우저인지 — 잠그기 버튼 노출 판단 */
+  groupIsOwner: boolean;
+  groupLocked: boolean;
 }
 
 type Action =
@@ -102,7 +105,13 @@ type Action =
   | { type: "setNick"; value: string }
   | { type: "groupBusy"; on: boolean }
   | { type: "groupError"; message: string | null }
-  | { type: "groupEntered"; code: string; condition: GroupCondition }
+  | {
+      type: "groupEntered";
+      code: string;
+      condition: GroupCondition;
+      isOwner: boolean;
+    }
+  | { type: "groupLocked"; locked: boolean }
   | { type: "groupLeft" };
 
 const initialState: State = {
@@ -131,6 +140,8 @@ const initialState: State = {
   nick: "",
   groupBusy: false,
   groupError: null,
+  groupIsOwner: false,
+  groupLocked: false,
 };
 
 function reducer(state: State, action: Action): State {
@@ -261,6 +272,8 @@ function reducer(state: State, action: Action): State {
         groupCode: action.code,
         groupBusy: false,
         groupError: null,
+        groupIsOwner: action.isOwner,
+        groupLocked: Boolean(action.condition.locked),
         base: action.condition.base,
         radiusM: action.condition.radiusM,
         cats: action.condition.cats,
@@ -272,8 +285,18 @@ function reducer(state: State, action: Action): State {
         missStreak: 0,
       };
 
+    case "groupLocked":
+      return { ...state, groupLocked: action.locked };
+
     case "groupLeft":
-      return { ...state, groupCode: null, groupError: null, groupBusy: false };
+      return {
+        ...state,
+        groupCode: null,
+        groupError: null,
+        groupBusy: false,
+        groupIsOwner: false,
+        groupLocked: false,
+      };
 
     default:
       return state;
@@ -451,7 +474,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
 
   /* ── 그룹 ────────────────────────────────────────────── */
 
-  const groupFeed = useGroupFeed(state.groupCode);
+  const groupFeed = useGroupFeed(state.groupCode, state.nick);
 
   /** 닉네임만 브라우저에 남깁니다. 좌표나 결과는 저장하지 않습니다. */
   useEffect(() => {
@@ -484,7 +507,16 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
     async (code: string) => {
       dispatch({ type: "groupBusy", on: true });
       try {
-        const res = await fetch(`/api/group/${code}`);
+        const res = await fetch(
+          `/api/group/${code}?voter=${encodeURIComponent(groupFeed.voterId)}`,
+        );
+        if (res.status === 403) {
+          dispatch({
+            type: "groupError",
+            message: "이 방은 잠겨 있어 새로 들어갈 수 없습니다.",
+          });
+          return;
+        }
         if (res.status === 404) {
           dispatch({
             type: "groupError",
@@ -506,18 +538,20 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
         const data = (await res.json()) as {
           code: string;
           condition: GroupCondition;
+          isOwner?: boolean;
         };
         dispatch({
           type: "groupEntered",
           code: data.code,
           condition: data.condition,
+          isOwner: Boolean(data.isOwner),
         });
         syncRoomParam(data.code);
       } catch {
         dispatch({ type: "groupError", message: "방에 들어가지 못했습니다." });
       }
     },
-    [syncRoomParam],
+    [syncRoomParam, groupFeed.voterId],
   );
 
   const createRoom = useCallback(async () => {
@@ -526,7 +560,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
       const res = await fetch("/api/group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base, radiusM, cats }),
+        body: JSON.stringify({ base, radiusM, cats, voterId: groupFeed.voterId }),
       });
       if (res.status === 429) {
         dispatch({
@@ -547,12 +581,33 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
         type: "groupEntered",
         code: data.code,
         condition: data.condition,
+        isOwner: true,
       });
       syncRoomParam(data.code);
     } catch {
       dispatch({ type: "groupError", message: "방을 만들지 못했습니다." });
     }
-  }, [base, radiusM, cats, syncRoomParam]);
+  }, [base, radiusM, cats, syncRoomParam, groupFeed.voterId]);
+
+  const toggleLock = useCallback(
+    async (locked: boolean) => {
+      const code = state.groupCode;
+      if (!code) return;
+      dispatch({ type: "groupLocked", locked }); // 먼저 화면을 바꿉니다
+      try {
+        const res = await fetch(`/api/group/${code}/lock`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voterId: groupFeed.voterId, locked }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+      } catch {
+        dispatch({ type: "groupLocked", locked: !locked });
+        dispatch({ type: "groupError", message: "잠금을 바꾸지 못했습니다." });
+      }
+    },
+    [state.groupCode, groupFeed.voterId],
+  );
 
   const leaveRoom = useCallback(() => {
     dispatch({ type: "groupLeft" });
@@ -584,6 +639,9 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
           placeName: winner.name,
           cat: winner.cat,
           distM: Math.round(distFromBase),
+          // 다른 참가자가 카카오맵으로 바로 넘어갈 수 있게
+          url: winner.url,
+          voterId: groupFeed.voterId,
         }),
       });
       if (res.ok) groupFeed.refresh();
@@ -708,7 +766,12 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
             error={state.groupError}
             expired={groupFeed.expired}
             feed={groupFeed.throws}
+            members={groupFeed.members}
+            isOwner={state.groupIsOwner}
+            locked={state.groupLocked}
             onVote={groupFeed.vote}
+            onRemove={groupFeed.remove}
+            onToggleLock={toggleLock}
             radiusM={state.radiusM}
             cats={state.cats}
             onNick={(value) => dispatch({ type: "setNick", value })}

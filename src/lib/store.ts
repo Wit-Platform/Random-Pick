@@ -21,6 +21,8 @@ export interface Store {
   rpush(key: string, value: string): Promise<void>;
   lrange(key: string, start: number, stop: number): Promise<string[]>;
   ltrim(key: string, start: number, stop: number): Promise<void>;
+  /** 값이 정확히 일치하는 항목을 모두 제거 */
+  lrem(key: string, value: string): Promise<void>;
   expire(key: string, ttlSec: number): Promise<void>;
 }
 
@@ -90,6 +92,9 @@ function createUpstashStore(url: string, token: string): Store {
     },
     async ltrim(key, start, stop) {
       await cmd("LTRIM", key, start, stop);
+    },
+    async lrem(key, value) {
+      await cmd("LREM", key, 0, value);
     },
     async expire(key, ttlSec) {
       await cmd("EXPIRE", key, ttlSec);
@@ -196,6 +201,11 @@ function createMemoryStore(): Store {
         start < 0 ? Math.max(0, list.length + start) : start,
         end,
       );
+    },
+    async lrem(key, value) {
+      const entry = live(key);
+      if (!entry || !Array.isArray(entry.value)) return;
+      entry.value = entry.value.filter((item) => item !== value);
     },
     async expire(key, ttlSec) {
       const entry = live(key);

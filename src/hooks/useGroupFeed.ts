@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { FEED_POLL_MS } from "@/lib/config";
+import type { GroupMember } from "@/lib/group";
 import type { GroupThrowWithVotes, VoteValue } from "@/lib/types";
 
 const VOTER_STORAGE_KEY = "lunch:voter";
@@ -32,9 +33,13 @@ function readVoterId(): string {
 
 export interface GroupFeed {
   throws: GroupThrowWithVotes[];
+  members: GroupMember[];
   expired: boolean;
   refresh: () => void;
   vote: (entryId: string, value: VoteValue) => Promise<void>;
+  remove: (entryId: string) => Promise<void>;
+  /** 이 브라우저의 식별자. 방 잠그기 요청에 필요합니다 */
+  voterId: string;
 }
 
 /**
@@ -43,10 +48,20 @@ export interface GroupFeed {
  * 탭이 백그라운드면 요청을 보내지 않습니다 — 점심 정하고 탭을 열어둔 사람 수만큼
  * 서버 요청이 쌓이는 걸 막기 위해서입니다. 탭이 다시 보이면 즉시 한 번 당겨옵니다.
  */
-export function useGroupFeed(code: string | null): GroupFeed {
+export function useGroupFeed(code: string | null, nick: string): GroupFeed {
   const [throws, setThrows] = useState<GroupThrowWithVotes[]>([]);
+  const [members, setMembers] = useState<GroupMember[]>([]);
   const [expired, setExpired] = useState(false);
   const [nonce, setNonce] = useState(0);
+
+  /**
+   * 닉네임은 ref로 읽습니다. 의존성에 넣으면 한 글자 칠 때마다 폴링이
+   * 다시 시작됩니다.
+   */
+  const nickRef = useRef(nick);
+  useEffect(() => {
+    nickRef.current = nick;
+  }, [nick]);
 
   const voterId = useMemo(
     () => (typeof window === "undefined" ? "" : readVoterId()),
@@ -106,9 +121,30 @@ export function useGroupFeed(code: string | null): GroupFeed {
     [code, voterId, refresh],
   );
 
+  /** 본인이 올린 항목 삭제 */
+  const remove = useCallback(
+    async (entryId: string) => {
+      if (!code || !voterId) return;
+      setThrows((current) => current.filter((e) => e.id !== entryId));
+      try {
+        const res = await fetch(`/api/group/${code}/throws`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entryId, voterId }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+      } catch {
+        // 실패하면 다음 폴링에서 되돌아옵니다
+        refresh();
+      }
+    },
+    [code, voterId, refresh],
+  );
+
   useEffect(() => {
     if (!code) {
       setThrows([]);
+      setMembers([]);
       setExpired(false);
       return;
     }
@@ -129,8 +165,13 @@ export function useGroupFeed(code: string | null): GroupFeed {
 
       inFlight = new AbortController();
       try {
-        const query = voterId ? `?voter=${encodeURIComponent(voterId)}` : "";
-        const res = await fetch(`/api/group/${code}/throws${query}`, {
+        const query = new URLSearchParams();
+        if (voterId) query.set("voter", voterId);
+        // 하트비트 — 이 요청 자체가 "지금 방에 있다"는 신호입니다
+        const currentNick = nickRef.current.trim();
+        if (currentNick) query.set("nick", currentNick);
+
+        const res = await fetch(`/api/group/${code}/throws?${query}`, {
           signal: inFlight.signal,
         });
         if (cancelled) return;
@@ -138,8 +179,12 @@ export function useGroupFeed(code: string | null): GroupFeed {
         if (res.status === 404) {
           setExpired(true);
         } else if (res.ok) {
-          const data = (await res.json()) as { throws: GroupThrowWithVotes[] };
+          const data = (await res.json()) as {
+            throws: GroupThrowWithVotes[];
+            members?: GroupMember[];
+          };
           setThrows(data.throws);
+          setMembers(data.members ?? []);
           setExpired(false);
         }
       } catch {
@@ -166,5 +211,5 @@ export function useGroupFeed(code: string | null): GroupFeed {
     };
   }, [code, nonce, voterId]);
 
-  return { throws, expired, refresh, vote };
+  return { throws, members, expired, refresh, vote, remove, voterId };
 }

@@ -86,6 +86,13 @@ export default function PrivacyPage() {
               </td>
               <td>12시간</td>
             </tr>
+            <tr>
+              <td>
+                참가자 목록 (닉네임과 마지막 접속 시각). 25초 넘게 소식이 없으면
+                목록에서 빠집니다
+              </td>
+              <td>12시간</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -96,7 +103,12 @@ export default function PrivacyPage() {
       </p>
       <p>
         <strong>초대 코드를 아는 사람은 누구나 그 방의 기록을 볼 수 있습니다.</strong> 닉네임에
-        실명이나 연락처를 넣지 마세요.
+        실명이나 연락처를 넣지 마세요. 방을 만든 사람은 인원이 모인 뒤
+        <strong> 새 참가를 막을 수 있습니다.</strong>
+      </p>
+      <p>
+        올린 결과는 <strong>본인이 직접 내릴 수 있습니다</strong> (목록의 ✕). 방을 나가도
+        이미 올린 결과는 남으므로, 지우려면 나가기 전에 내려주세요.
       </p>
 
       <h2>3. 브라우저에 저장하는 것</h2>
