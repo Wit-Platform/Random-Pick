@@ -162,9 +162,20 @@ describe("blur / reveal", () => {
   });
 
   it("판정 반경이 상·하한 안에 있습니다", () => {
-    expect(revealRadiusM(RADIUS.min)).toBe(120);
+    expect(revealRadiusM(RADIUS.min)).toBe(40);
     expect(revealRadiusM(1000)).toBe(300);
     expect(revealRadiusM(RADIUS.max)).toBe(500);
+  });
+
+  it("판정 반경이 던지는 거리를 넘지 않습니다", () => {
+    // 넘으면 반경 밖의 가게가 당첨될 수 있습니다
+    for (let r = RADIUS.min; r <= RADIUS.max; r += RADIUS.step) {
+      expect(revealRadiusM(r)).toBeLessThanOrEqual(r);
+    }
+  });
+
+  it("슬라이더 눈금이 최소·최대에 정확히 닿습니다", () => {
+    expect((RADIUS.max - RADIUS.min) % RADIUS.step).toBe(0);
   });
 });
 

@@ -161,7 +161,11 @@ function reducer(state: State, action: Action): State {
     case "widenRadius":
       return {
         ...state,
-        radiusM: Math.min(RADIUS.max, state.radiusM + 500),
+        // 좁은 반경에 500m를 더하면 성격이 완전히 바뀝니다
+        radiusM: Math.min(
+          RADIUS.max,
+          state.radiusM + (state.radiusM < 600 ? 100 : 500),
+        ),
         phase: "idle",
         landing: null,
         winner: null,

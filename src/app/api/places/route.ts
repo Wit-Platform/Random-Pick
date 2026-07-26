@@ -11,7 +11,8 @@ import type { CategoryId, LatLng } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const MIN_RADIUS = 50;
+// 판정 반경이 40m까지 내려가므로 라우트가 그것을 올려버리지 않게 둡니다
+const MIN_RADIUS = 10;
 const MAX_RADIUS = 20_000;
 const MAX_LIMIT = 200;
 
