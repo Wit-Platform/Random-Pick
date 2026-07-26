@@ -81,6 +81,11 @@ export const RATE_LIMITS = {
   groupCreate: { limit: 8, windowSec: 600 },
   groupWrite: { limit: 30, windowSec: 60 },
   groupRead: { limit: 120, windowSec: 60 },
+  /**
+   * 피드백은 인증 없이 메일을 발송시키는 경로라 좁게 잡습니다. 다만 검증 실패는
+   * 세지 않으므로(라우트에서 검증을 먼저 합니다) 실제로 보낸 횟수 기준입니다.
+   */
+  feedback: { limit: 5, windowSec: 600 },
 } as const;
 
 /**

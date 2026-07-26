@@ -40,6 +40,7 @@ npm run dev
 | `UPSTASH_REDIS_REST_URL` | 서버 전용 | 캐시·rate limit이 인스턴스별로, 그룹 비활성 |
 | `UPSTASH_REDIS_REST_TOKEN` | 서버 전용 | 위와 같음 |
 | `KAKAO_DAILY_BUDGET` | 서버 전용 | 8000 (자체 호출 예산) |
+| `RESEND_API_KEY` | 서버 전용 | 한마디가 메일로 안 나가고 Upstash에만 보관 |
 
 > `KAKAO_REST_KEY`에 `NEXT_PUBLIC_` 접두사를 붙이지 마세요. REST 키는 도메인 제한이
 > 없어서 유출되면 그대로 도용됩니다. JS 키는 브라우저에 노출되는 것이 정상이며
@@ -270,6 +271,19 @@ npm test               # 35개 단위 테스트 (물리·좌표·매핑·그룹)
 npm run verify:kakao   # 카카오 실연동 검증 (KAKAO_REST_KEY 필요)
 npm run preflight      # 배포 전 환경변수 점검
 ```
+
+## 개발자에게 한마디
+
+푸터의 폼으로 받습니다. `mailto:`를 쓰지 않으므로 메일 앱이 없어도 되고 주소가
+화면·번들에 노출되지 않습니다.
+
+- **저장을 먼저, 발송은 그다음입니다.** Resend가 설정되지 않았거나 장애가 나도 내용이
+  사라지지 않습니다. Upstash 콘솔의 `lunch:feedback` 리스트에서 30일간 읽을 수 있습니다.
+- `RESEND_API_KEY`를 넣으면 메일로 옵니다. 도메인을 인증하지 않았다면 발신자는
+  `onboarding@resend.dev`가 되고, 이 발신자는 **Resend 계정 소유자 본인 주소로만**
+  발송됩니다 — `FEEDBACK_TO`가 계정 메일과 같다면 그대로 동작합니다.
+- 스팸 방어는 허니팟 + IP 상한(5회/10분)입니다. **검증 실패는 상한을 소진하지 않습니다** —
+  순서를 반대로 두면 메일 주소를 한 번 잘못 적은 것만으로 정작 할 말이 있는 사람이 막힙니다.
 
 ## 아직 안 된 것
 

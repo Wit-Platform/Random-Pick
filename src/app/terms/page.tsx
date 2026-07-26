@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { CONTACT_EMAIL, POLICY_EFFECTIVE_DATE, SITE } from "@/lib/site";
+import { POLICY_EFFECTIVE_DATE, SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: `이용약관 — ${SITE.name}`,
@@ -76,8 +76,8 @@ export default function TermsPage() {
 
       <h2>7. 문의</h2>
       <p>
-        {/* 주소를 화면에 찍지 않습니다 — 메일 앱에는 자동으로 채워집니다 */}
-        <a href={`mailto:${CONTACT_EMAIL}`}>메일로 문의하기</a>
+        {/* 메일 앱을 열지 않고 사이트에서 바로 보냅니다 */}
+        <Link href="/#feedback">개발자에게 한마디 남기기 →</Link>
       </p>
 
       <p className="doc-back doc-back-bottom">

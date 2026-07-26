@@ -1094,15 +1094,60 @@ input[type="text"]:focus-visible {
   border-top: 1px solid var(--line);
 }
 
-.btn.feedback {
-  border-style: dashed;
-  text-decoration: none;
-  color: var(--ink-2);
+textarea {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 9px 11px;
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
 }
 
-.btn.feedback:hover {
-  border-style: solid;
+textarea::placeholder {
+  color: var(--ink-3);
+}
+
+textarea:focus-visible {
+  border-color: var(--water);
+}
+
+/* 봇용 미끼 — 사람에게는 보이지 않지만 화면에서 완전히 제거하지는 않습니다 */
+.honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.feedback-done {
+  border: 1px solid var(--water);
+  background: var(--water-soft);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.feedback-done b {
+  font-size: 14.5px;
   color: var(--water);
+}
+
+.feedback-done p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
 }
 
 .footer-links {

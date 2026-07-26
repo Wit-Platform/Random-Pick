@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { GROUP } from "@/lib/config";
-import { CONTACT_EMAIL, POLICY_EFFECTIVE_DATE, SITE } from "@/lib/site";
+import { POLICY_EFFECTIVE_DATE, SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: `개인정보 · 위치정보 처리방침 — ${SITE.name}`,
@@ -127,7 +127,18 @@ export default function PrivacyPage() {
         플랫폼 기본 정책에 따라 기록될 수 있습니다.
       </p>
 
-      <h2>5. 처리를 위탁하는 곳</h2>
+      <h2>5. 개발자에게 한마디</h2>
+      <p>
+        보내주신 내용은 적어주신 글, 답장 주소(선택), <strong>브라우저 종류(User-Agent)</strong>,
+        받은 시각이 함께 전달됩니다. 문제 상황을 재현하는 데 브라우저 정보가 필요해서입니다.
+        <strong>IP 주소는 전달하지 않습니다</strong> — 요청 제한 목적으로만 쓰입니다.
+      </p>
+      <p>
+        내용은 메일로 발송되며, 발송이 실패하더라도 사라지지 않도록 <strong>30일간</strong>
+        저장한 뒤 자동 삭제됩니다. 답장 주소를 비워두시면 회신하지 않습니다.
+      </p>
+
+      <h2>6. 처리를 위탁하는 곳</h2>
       <div className="doc-table">
         <table>
           <thead>
@@ -150,14 +161,19 @@ export default function PrivacyPage() {
             </tr>
             <tr>
               <td>Upstash</td>
-              <td>조회 캐시, 그룹 기록 저장</td>
-              <td>2·4항의 항목</td>
+              <td>조회 캐시, 그룹 기록, 한마디 보관</td>
+              <td>2 · 4 · 5항의 항목</td>
+            </tr>
+            <tr>
+              <td>Resend</td>
+              <td>한마디 메일 발송</td>
+              <td>5항의 항목</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <h2>6. 이용자의 권리</h2>
+      <h2>7. 이용자의 권리</h2>
       <ul>
         <li>
           <strong>위치 권한 철회</strong> — 브라우저 사이트 설정에서 언제든 취소할 수
@@ -167,15 +183,15 @@ export default function PrivacyPage() {
           <strong>닉네임 삭제</strong> — 브라우저의 사이트 데이터 삭제
         </li>
         <li>
-          <strong>그룹 기록</strong> — 12시간 후 자동 삭제. 즉시 삭제를 원하면 아래 메일로
+          <strong>그룹 기록</strong> — 12시간 후 자동 삭제. 즉시 삭제를 원하면 아래 문의로
           방 코드를 알려주세요.
         </li>
       </ul>
 
-      <h2>7. 문의</h2>
+      <h2>8. 문의</h2>
       <p>
-        {/* 주소를 화면에 찍지 않습니다 — 메일 앱에는 자동으로 채워집니다 */}
-        <a href={`mailto:${CONTACT_EMAIL}`}>메일로 문의하기</a>
+        {/* 메일 앱을 열지 않고 사이트에서 바로 보냅니다 */}
+        <Link href="/#feedback">개발자에게 한마디 남기기 →</Link>
       </p>
 
       <p className="doc-back doc-back-bottom">
