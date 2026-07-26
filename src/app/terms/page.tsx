@@ -76,7 +76,8 @@ export default function TermsPage() {
 
       <h2>7. 문의</h2>
       <p>
-        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+        {/* 주소를 화면에 찍지 않습니다 — 메일 앱에는 자동으로 채워집니다 */}
+        <a href={`mailto:${CONTACT_EMAIL}`}>메일로 문의하기</a>
       </p>
 
       <p className="doc-back doc-back-bottom">

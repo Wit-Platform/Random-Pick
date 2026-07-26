@@ -2,9 +2,12 @@ import { ALL_CATEGORY_IDS } from "@/lib/categories";
 import { RATE_LIMITS } from "@/lib/config";
 import {
   appendThrow,
+  attachVotes,
   loadCondition,
   loadThrows,
+  newThrowId,
   sanitizeNick,
+  sanitizeVoterId,
 } from "@/lib/group";
 import {
   checkRateLimit,
@@ -66,8 +69,13 @@ export async function GET(
   );
   if (resolved instanceof Response) return resolved;
 
+  const voterId = sanitizeVoterId(
+    new URL(request.url).searchParams.get("voter"),
+  );
+  const entries = await loadThrows(resolved.code);
+
   return Response.json(
-    { throws: await loadThrows(resolved.code) },
+    { throws: await attachVotes(resolved.code, entries, voterId) },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -109,6 +117,7 @@ export async function POST(
 
   const distRaw = Number(b.distM);
   const entry: GroupThrow = {
+    id: newThrowId(),
     nick,
     placeName: placeName.slice(0, 40),
     cat,

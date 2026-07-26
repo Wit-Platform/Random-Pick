@@ -820,6 +820,270 @@ input[type="text"]:focus-visible {
   flex: none;
 }
 
+/* ── 투표 (붐업 / 붐따) ───────────────────────────────── */
+
+.feed-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.feed-place {
+  overflow-wrap: anywhere;
+}
+
+.feed-main .num {
+  font-size: 11.5px;
+}
+
+.vote {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+
+.vote-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  line-height: 1;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 90ms ease;
+}
+
+.vote-btn:active {
+  transform: scale(0.94);
+}
+
+.vote-btn.on.up {
+  border-color: var(--water);
+  background: var(--water-soft);
+  color: var(--water);
+  font-weight: 700;
+}
+
+.vote-btn.on.down {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.vote-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  min-width: 0.8em;
+  text-align: right;
+}
+
+/* ── 도움말 ───────────────────────────────────────────── */
+
+.help-btn {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  margin-left: 4px;
+}
+
+.help-btn:hover {
+  border-color: var(--water);
+  color: var(--water);
+}
+
+.guide-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: end center;
+  background: color-mix(in srgb, var(--ink) 42%, transparent);
+  backdrop-filter: blur(3px);
+  padding: 16px;
+  overflow-y: auto;
+  animation: scrim-in 180ms ease both;
+}
+
+@media (min-width: 700px) {
+  .guide-scrim {
+    place-items: center;
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.guide {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: guide-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+@keyframes guide-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.guide-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.guide-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.guide-steps li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.guide-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--water);
+  color: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.guide-steps b {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.guide-steps p {
+  margin: 3px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.guide-note {
+  color: var(--ink-3) !important;
+  font-size: 12.5px !important;
+}
+
+.guide-diagram {
+  margin: 10px 0 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 6px;
+}
+
+.guide-diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.guide-diagram .g-base {
+  fill: var(--water);
+}
+
+.guide-diagram .g-ring {
+  fill: none;
+  stroke: var(--water);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  opacity: 0.5;
+}
+
+.guide-diagram .g-pull {
+  stroke: var(--ink-3);
+  stroke-width: 2.5;
+  color: var(--ink-3);
+}
+
+.guide-diagram .g-stone {
+  fill: var(--stone);
+}
+
+.guide-diagram .g-fly {
+  stroke: var(--flare);
+  stroke-width: 3;
+  color: var(--flare);
+}
+
+.guide-diagram .g-label {
+  font-size: 12px;
+  fill: var(--ink-3);
+  font-family: var(--font-sans);
+}
+
+.guide-diagram .g-label.fly {
+  fill: var(--flare);
+  font-weight: 700;
+}
+
+.guide-group {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.guide-group b {
+  font-size: 14px;
+}
+
+.guide-group p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
 /* ── 푸터 ─────────────────────────────────────────────── */
 
 .site-footer {

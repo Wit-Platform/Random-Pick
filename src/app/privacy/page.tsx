@@ -80,6 +80,12 @@ export default function PrivacyPage() {
               <td>방장이 정한 기준점 좌표 · 반경 · 음식 종류</td>
               <td>12시간</td>
             </tr>
+            <tr>
+              <td>
+                붐업 · 붐따 투표 수, 그리고 어떤 브라우저가 어떻게 투표했는지
+              </td>
+              <td>12시간</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -95,9 +101,22 @@ export default function PrivacyPage() {
 
       <h2>3. 브라우저에 저장하는 것</h2>
       <p>
-        닉네임을 다시 입력하지 않아도 되도록 <code>localStorage</code>에 닉네임만
-        저장합니다. 브라우저 설정에서 사이트 데이터를 지우면 삭제됩니다. 광고·분석용 쿠키나
-        추적 스크립트는 사용하지 않습니다.
+        <code>localStorage</code>에 두 가지만 저장합니다.
+      </p>
+      <ul>
+        <li>
+          <strong>닉네임</strong> — 매번 다시 입력하지 않도록
+        </li>
+        <li>
+          <strong>투표자 식별자</strong> — 계정이 없어서, 중복 투표를 막고 눌렀던 표를
+          되돌릴 수 있게 브라우저마다 임의의 문자열을 하나 만들어 둡니다. 개인을 식별하는
+          값이 아니며 닉네임이나 다른 정보와 연결하지 않습니다. 브라우저를 바꾸면 새로
+          만들어지므로 <strong>엄격한 1인 1표를 보장하지는 않습니다.</strong>
+        </li>
+      </ul>
+      <p>
+        브라우저 설정에서 사이트 데이터를 지우면 둘 다 삭제됩니다. 광고·분석용 쿠키나 추적
+        스크립트는 사용하지 않습니다.
       </p>
 
       <h2>4. 요청 제한을 위한 IP 사용</h2>
@@ -155,7 +174,8 @@ export default function PrivacyPage() {
 
       <h2>7. 문의</h2>
       <p>
-        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+        {/* 주소를 화면에 찍지 않습니다 — 메일 앱에는 자동으로 채워집니다 */}
+        <a href={`mailto:${CONTACT_EMAIL}`}>메일로 문의하기</a>
       </p>
 
       <p className="doc-back doc-back-bottom">

@@ -15,6 +15,9 @@ export interface Store {
   incr(key: string, by?: number): Promise<number>;
   /** 남은 만료 시간(초). -1 = 만료 없음, -2 = 키 없음 (Redis 규약) */
   ttl(key: string): Promise<number>;
+  del(key: string): Promise<void>;
+  /** 여러 키를 한 번에. 투표 수를 항목마다 조회하면 왕복이 폭발합니다 */
+  mget(keys: string[]): Promise<(string | null)[]>;
   rpush(key: string, value: string): Promise<void>;
   lrange(key: string, start: number, stop: number): Promise<string[]>;
   ltrim(key: string, start: number, stop: number): Promise<void>;
@@ -71,6 +74,13 @@ function createUpstashStore(url: string, token: string): Store {
     },
     async ttl(key) {
       return cmd<number>("TTL", key);
+    },
+    async del(key) {
+      await cmd("DEL", key);
+    },
+    async mget(keys) {
+      if (keys.length === 0) return [];
+      return cmd<(string | null)[]>("MGET", ...keys);
     },
     async rpush(key, value) {
       await cmd("RPUSH", key, value);
@@ -150,6 +160,16 @@ function createMemoryStore(): Store {
       if (!entry) return -2;
       if (!Number.isFinite(entry.expiresAt)) return -1;
       return Math.max(0, Math.ceil((entry.expiresAt - Date.now()) / 1000));
+    },
+    async del(key) {
+      map.delete(key);
+    },
+    async mget(keys) {
+      return keys.map((key) => {
+        const entry = live(key);
+        if (!entry || Array.isArray(entry.value)) return null;
+        return entry.value;
+      });
     },
     async rpush(key, value) {
       const entry = live(key);

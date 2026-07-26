@@ -6,7 +6,7 @@ import { categoryLabel } from "@/lib/categories";
 import { GROUP } from "@/lib/config";
 import { formatDistance } from "@/lib/geo";
 import { isValidRoomCode, normalizeRoomCode } from "@/lib/room-code";
-import type { CategoryId, GroupThrow } from "@/lib/types";
+import type { CategoryId, GroupThrowWithVotes, VoteValue } from "@/lib/types";
 
 export interface GroupPanelProps {
   code: string | null;
@@ -14,7 +14,8 @@ export interface GroupPanelProps {
   busy: boolean;
   error: string | null;
   expired: boolean;
-  feed: GroupThrow[];
+  feed: GroupThrowWithVotes[];
+  onVote: (entryId: string, value: VoteValue) => void;
   radiusM: number;
   cats: CategoryId[];
   onNick: (value: string) => void;
@@ -119,15 +120,42 @@ export default function GroupPanel(props: GroupPanelProps) {
 
           {feed.length > 0 ? (
             <div className="feed">
-              {[...feed].reverse().map((entry, i) => (
-                <div className="feed-item" key={`${entry.ts}-${i}`}>
-                  <span>
-                    <b>{entry.nick}</b> · {entry.placeName}
-                    <span className="feed-cat"> {categoryLabel(entry.cat)}</span>
-                  </span>
-                  <span className="num">
-                    {formatDistance(entry.distM)} · {relativeTime(entry.ts)}
-                  </span>
+              {[...feed].reverse().map((entry) => (
+                <div className="feed-item" key={entry.id}>
+                  <div className="feed-main">
+                    <span className="feed-place">
+                      <b>{entry.nick}</b> · {entry.placeName}
+                    </span>
+                    <span className="num">
+                      {categoryLabel(entry.cat)} · {formatDistance(entry.distM)} ·{" "}
+                      {relativeTime(entry.ts)}
+                    </span>
+                  </div>
+
+                  <div className="vote">
+                    <button
+                      type="button"
+                      className={`vote-btn${entry.myVote === "up" ? " on up" : ""}`}
+                      onClick={() => props.onVote(entry.id, "up")}
+                      aria-pressed={entry.myVote === "up"}
+                      aria-label={`${entry.placeName} 붐업`}
+                      title="붐업"
+                    >
+                      <span aria-hidden="true">👍</span>
+                      <span className="vote-count">{entry.up}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`vote-btn${entry.myVote === "down" ? " on down" : ""}`}
+                      onClick={() => props.onVote(entry.id, "down")}
+                      aria-pressed={entry.myVote === "down"}
+                      aria-label={`${entry.placeName} 붐따`}
+                      title="붐따"
+                    >
+                      <span aria-hidden="true">👎</span>
+                      <span className="vote-count">{entry.down}</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 
 import { useGroupFeed } from "@/hooks/useGroupFeed";
 import { ALL_CATEGORY_IDS } from "@/lib/categories";
@@ -24,12 +24,14 @@ import type {
 } from "@/lib/types";
 
 import ControlSheet from "./ControlSheet";
+import Guide from "./Guide";
 import GroupPanel from "./GroupPanel";
 import MapStage from "./MapStage";
 import ResultCard from "./ResultCard";
 import SiteFooter from "./SiteFooter";
 
 const NICK_STORAGE_KEY = "lunch:nick";
+const GUIDE_STORAGE_KEY = "lunch:guide-seen";
 
 /** 허탕 사유. 사용자가 할 수 있는 조치가 달라서 구분합니다 */
 export type MissReason = "overshoot" | "empty" | null;
@@ -303,6 +305,26 @@ function sampleBannerText(
 
 export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  // 처음 방문이면 사용법을 한 번 보여줍니다. 서버 렌더와 어긋나지 않도록
+  // 마운트 후에 판단합니다.
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (!window.localStorage.getItem(GUIDE_STORAGE_KEY)) setGuideOpen(true);
+    } catch {
+      // 저장이 막혀 있으면 매번 보여주지 않고 그냥 넘어갑니다
+    }
+  }, []);
+
+  const closeGuide = useCallback(() => {
+    setGuideOpen(false);
+    try {
+      window.localStorage.setItem(GUIDE_STORAGE_KEY, "1");
+    } catch {
+      // 무시
+    }
+  }, []);
 
   /* 현재 위치 — 실패하면 조용히 프리셋 안내로 넘어갑니다 */
   const locate = useCallback(() => {
@@ -584,11 +606,21 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
 
   return (
     <div className="app">
+      {guideOpen ? <Guide onClose={closeGuide} /> : null}
       <main className="main">
         <header className="topbar">
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand">랜덤픽</span>
           <span className="brand-sub">점심 뭐먹을래?</span>
+          <button
+            type="button"
+            className="help-btn"
+            onClick={() => setGuideOpen(true)}
+            aria-label="사용법 보기"
+            title="사용법"
+          >
+            ?
+          </button>
         </header>
 
         <div className="stage-wrap">
@@ -670,6 +702,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
             error={state.groupError}
             expired={groupFeed.expired}
             feed={groupFeed.throws}
+            onVote={groupFeed.vote}
             radiusM={state.radiusM}
             cats={state.cats}
             onNick={(value) => dispatch({ type: "setNick", value })}

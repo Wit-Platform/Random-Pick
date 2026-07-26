@@ -107,11 +107,22 @@ export default function ResultCard(props: ResultCardProps) {
         </a>
       ) : null}
 
-      {decided ? (
-        <p className="decided">
-          결정했습니다. 잘 먹고 오세요.
-          {shared ? " 그룹에 공유했습니다." : null}
-        </p>
+      {/* 결정은 그룹에서만 의미가 있습니다 — 혼자 먹으러 갈 때 누를 버튼이 필요하지 않습니다 */}
+      {!shared ? (
+        <div className="row">
+          <button type="button" className="btn primary" onClick={props.onAgain}>
+            다시 던지기
+          </button>
+        </div>
+      ) : decided ? (
+        <>
+          <p className="decided">그룹에 올렸습니다. 다른 사람 표를 기다려보세요.</p>
+          <div className="row">
+            <button type="button" className="btn" onClick={props.onAgain}>
+              한 번 더 던지기
+            </button>
+          </div>
+        </>
       ) : (
         <>
           <div className="row">
@@ -126,20 +137,12 @@ export default function ResultCard(props: ResultCardProps) {
               다시 던지기
             </button>
           </div>
-          {shared ? (
-            <p className="hint">
-              결정하면 닉네임과 식당 이름이 그룹원 전원에게 공개됩니다.
-            </p>
-          ) : null}
+          <p className="hint">
+            올리면 그룹원이 <b>붐업 👍 / 붐따 👎</b>로 투표할 수 있습니다. 닉네임과
+            식당 이름이 방에 공개됩니다.
+          </p>
         </>
       )}
-      {decided ? (
-        <div className="row">
-          <button type="button" className="btn" onClick={props.onAgain}>
-            한 번 더 던지기
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

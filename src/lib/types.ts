@@ -56,9 +56,21 @@ export interface GroupCondition {
 }
 
 export interface GroupThrow {
+  /** 투표 대상을 지목하기 위한 식별자. 서버가 붙입니다 */
+  id: string;
   nick: string;
   placeName: string;
   cat: CategoryId;
   distM: number;
   ts: number;
+}
+
+/** 붐업(찬성) / 붐따(반대) */
+export type VoteValue = "up" | "down";
+
+export interface GroupThrowWithVotes extends GroupThrow {
+  up: number;
+  down: number;
+  /** 이 브라우저가 던진 표. 없으면 null */
+  myVote: VoteValue | null;
 }
