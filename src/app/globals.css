@@ -156,7 +156,7 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 18px;
+  padding: 10px 18px;
   background: var(--surface);
 }
 
@@ -189,11 +189,16 @@ button {
   flex: none;
   background: var(--surface);
   overflow-y: auto;
-  max-height: 56dvh;
-  padding: 8px 18px 22px;
+  /**
+   * 지도가 히어로입니다. 패널이 56dvh를 먹으면 지도가 min-height 하한(200px)에
+   * 걸리고, 둘의 합이 화면을 넘어 패널 아래쪽이 잘립니다. 그 상태에서 섹션을 펼치면
+   * 열린 내용이 화면 밖에 생겨 "토글이 동작하지 않는다"처럼 보입니다.
+   */
+  max-height: 44dvh;
+  padding: 6px 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
   border-radius: var(--r-lg) var(--r-lg) 0 0;
   margin-top: -14px;
   box-shadow: var(--shadow-2);
@@ -242,6 +247,16 @@ button {
   }
 }
 
+@media (max-width: 400px) {
+  .btn {
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+  .panel {
+    gap: 14px;
+  }
+}
+
 /* ── 스테이지 ─────────────────────────────────────────── */
 
 /* 지도와 그 위에 겹치는 배너·힌트·스탬프의 좌표 기준 */
@@ -249,7 +264,8 @@ button {
   position: relative;
   display: flex;
   flex: 1 1 auto;
-  min-height: 260px;
+  /* 패널 max-height와 합쳐 화면을 넘지 않아야 합니다 */
+  min-height: 200px;
 }
 
 .stage {
