@@ -1,0 +1,172 @@
+"use client";
+
+import { useState } from "react";
+
+import { categoryLabel } from "@/lib/categories";
+import { GROUP } from "@/lib/config";
+import { formatDistance } from "@/lib/geo";
+import { isValidRoomCode, normalizeRoomCode } from "@/lib/room-code";
+import type { CategoryId, GroupThrow } from "@/lib/types";
+
+export interface GroupPanelProps {
+  code: string | null;
+  nick: string;
+  busy: boolean;
+  error: string | null;
+  expired: boolean;
+  feed: GroupThrow[];
+  radiusM: number;
+  cats: CategoryId[];
+  onNick: (value: string) => void;
+  onCreate: () => void;
+  onJoin: (code: string) => void;
+  onLeave: () => void;
+}
+
+function relativeTime(ts: number): string {
+  const diffSec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (diffSec < 60) return "방금";
+  const min = Math.round(diffSec / 60);
+  if (min < 60) return `${min}분 전`;
+  return `${Math.round(min / 60)}시간 전`;
+}
+
+export default function GroupPanel(props: GroupPanelProps) {
+  const { code, nick, busy, error, expired, feed } = props;
+  const [input, setInput] = useState("");
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+
+  const nickReady = nick.trim().length > 0;
+  const inputCode = normalizeRoomCode(input);
+  const canJoin = nickReady && isValidRoomCode(inputCode) && !busy;
+
+  async function copy(kind: "code" | "link") {
+    if (!code) return;
+    const text =
+      kind === "code" ? code : `${window.location.origin}/?room=${code}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(kind);
+      window.setTimeout(() => setCopied(null), 1600);
+    } catch {
+      // 클립보드 권한이 없으면 화면의 코드를 직접 읽어 쓰면 됩니다
+    }
+  }
+
+  return (
+    <div className="group">
+      <div className="group-head">
+        <span className="label">그룹</span>
+        {code ? <span className="value">{feed.length}개 결과</span> : null}
+      </div>
+
+      <label className="field">
+        <span className="field-label">닉네임</span>
+        <input
+          type="text"
+          value={nick}
+          maxLength={GROUP.maxNickLength}
+          placeholder="그룹원에게 보일 이름"
+          onChange={(e) => props.onNick(e.target.value)}
+        />
+      </label>
+
+      {code ? (
+        <>
+          <div className="room-code">
+            <span className="room-code-value">{code}</span>
+            <button type="button" className="btn" onClick={() => copy("code")}>
+              {copied === "code" ? "복사됨" : "코드 복사"}
+            </button>
+            <button type="button" className="btn" onClick={() => copy("link")}>
+              {copied === "link" ? "복사됨" : "링크 복사"}
+            </button>
+          </div>
+
+          <p className="hint">
+            반경 {formatDistance(props.radiusM)} ·{" "}
+            {props.cats.length === 0
+              ? "종류 미선택"
+              : props.cats.map(categoryLabel).join(", ")}
+          </p>
+
+          <p className="hint warn">
+            <b>이걸로 결정</b>을 누르면 닉네임과 식당 이름이 그룹원 전원에게
+            공개됩니다. 방은 12시간 뒤 자동으로 사라집니다.
+          </p>
+
+          {expired ? (
+            <p className="hint warn">
+              방이 만료됐습니다. 새로 만들어주세요.
+            </p>
+          ) : null}
+
+          {feed.length > 0 ? (
+            <div className="feed">
+              {[...feed].reverse().map((entry, i) => (
+                <div className="feed-item" key={`${entry.ts}-${i}`}>
+                  <span>
+                    <b>{entry.nick}</b> · {entry.placeName}
+                    <span className="feed-cat"> {categoryLabel(entry.cat)}</span>
+                  </span>
+                  <span className="num">
+                    {formatDistance(entry.distM)} · {relativeTime(entry.ts)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="hint">
+              아직 결정한 사람이 없습니다. 먼저 던져보세요.
+            </p>
+          )}
+
+          <button type="button" className="btn block" onClick={props.onLeave}>
+            방 나가기
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="btn block"
+            onClick={props.onCreate}
+            disabled={!nickReady || busy}
+          >
+            {busy ? "만드는 중…" : "방 만들기"}
+          </button>
+
+          <div className="join">
+            <input
+              type="text"
+              value={input}
+              maxLength={GROUP.codeLength + 2}
+              placeholder="초대 코드"
+              spellCheck={false}
+              autoCapitalize="characters"
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && canJoin) props.onJoin(inputCode);
+              }}
+              aria-label="초대 코드"
+            />
+            <button
+              type="button"
+              className="btn"
+              onClick={() => props.onJoin(inputCode)}
+              disabled={!canJoin}
+            >
+              참가
+            </button>
+          </div>
+
+          {!nickReady ? (
+            <p className="hint">먼저 닉네임을 입력해주세요.</p>
+          ) : null}
+        </>
+      )}
+
+      {error ? <p className="hint warn">{error}</p> : null}
+    </div>
+  );
+}
