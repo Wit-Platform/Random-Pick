@@ -695,11 +695,11 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
           phase={state.phase}
           onUseCurrentLocation={locate}
           onTogglePlaceMode={() => dispatch({ type: "togglePlaceMode" })}
-          onPreset={(at) => dispatch({ type: "setBase", at })}
           onRadius={(m) => dispatch({ type: "setRadius", m })}
           onToggleCat={(id) => dispatch({ type: "toggleCat", id })}
           onBlindThrow={() => dispatch({ type: "blindThrow" })}
         />
+
 
         {groupEnabled ? (
           <GroupPanel
@@ -718,11 +718,6 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
           />
         ) : null}
 
-        <p className="footnote">
-          {state.truncated
-            ? "지도의 점은 이 동네 표본입니다 (카카오 검색당 45건 상한). 당첨은 돌이 떨어진 자리에서 다시 조회해 정확히 판정합니다."
-            : "지도의 점은 반경 안 후보입니다."}
-        </p>
       </aside>
     </div>
   );

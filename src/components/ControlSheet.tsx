@@ -1,10 +1,10 @@
 "use client";
 
 import { CATEGORIES } from "@/lib/categories";
-import { PRESETS, RADIUS } from "@/lib/config";
+import { RADIUS } from "@/lib/config";
 import { formatDistance, walkMinutes } from "@/lib/geo";
 import { prefersDark } from "@/lib/palette";
-import type { CategoryId, LatLng, Phase } from "@/lib/types";
+import type { CategoryId, Phase } from "@/lib/types";
 
 export interface ControlSheetProps {
   radiusM: number;
@@ -17,7 +17,6 @@ export interface ControlSheetProps {
   phase: Phase;
   onUseCurrentLocation: () => void;
   onTogglePlaceMode: () => void;
-  onPreset: (at: LatLng) => void;
   onRadius: (m: number) => void;
   onToggleCat: (id: CategoryId) => void;
   onBlindThrow: () => void;
@@ -65,23 +64,9 @@ export default function ControlSheet(props: ControlSheetProps) {
             {placeMode ? "지도를 탭하세요" : "지도에서 찍기"}
           </button>
         </div>
-        <div className="row">
-          {PRESETS.map((preset) => (
-            <button
-              key={preset.name}
-              type="button"
-              className="btn"
-              onClick={() => props.onPreset(preset.at)}
-              disabled={!idle}
-            >
-              {preset.name}
-            </button>
-          ))}
-        </div>
         {geoDenied ? (
           <p className="hint">
-            위치를 가져오지 못했습니다. 위 버튼으로 고르거나 지도를 직접 탭해서
-            기준점을 정해주세요.
+            위치를 가져오지 못했습니다. 지도를 탭해서 기준점을 정해주세요.
           </p>
         ) : null}
       </div>
@@ -150,23 +135,15 @@ export default function ControlSheet(props: ControlSheetProps) {
         ) : null}
       </div>
 
-      <div className="group">
-        <div className="group-head">
-          <span className="label">던지기</span>
-        </div>
-        <p className="hint">
-          기준점에서 <b>당겼다 놓으면</b> 돌이 날아갑니다. 당긴 반대 방향으로
-          가고, 조준은 뜻대로 되지 않습니다.
-        </p>
-        <button
-          type="button"
-          className="btn block"
-          onClick={props.onBlindThrow}
-          disabled={!idle || noCats}
-        >
-          그냥 던지기
-        </button>
-      </div>
+      {/* 드래그를 못 하는 환경(키보드·스크린리더)을 위한 대체 수단 */}
+      <button
+        type="button"
+        className="btn block"
+        onClick={props.onBlindThrow}
+        disabled={!idle || noCats}
+      >
+        그냥 던지기
+      </button>
     </>
   );
 }
