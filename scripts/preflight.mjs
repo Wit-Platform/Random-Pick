@@ -30,14 +30,29 @@ const mark = (ok) => (ok ? "설정됨" : "없음  ");
 
 const jsKey = has("NEXT_PUBLIC_KAKAO_JS_KEY");
 const restKey = has("KAKAO_REST_KEY");
-const upstash = has("UPSTASH_REDIS_REST_URL") && has("UPSTASH_REDIS_REST_TOKEN");
+
+// Vercel의 Upstash 통합은 버전에 따라 두 가지 이름 중 하나로 주입합니다
+const upstashNative =
+  has("UPSTASH_REDIS_REST_URL") && has("UPSTASH_REDIS_REST_TOKEN");
+const upstashKv = has("KV_REST_API_URL") && has("KV_REST_API_TOKEN");
+const upstash = upstashNative || upstashKv;
+const upstashNaming = upstashNative
+  ? "UPSTASH_REDIS_REST_*"
+  : upstashKv
+    ? "KV_REST_API_*"
+    : null;
 const memGroup = process.env.ALLOW_MEMORY_GROUP === "1";
 const budget = process.env.KAKAO_DAILY_BUDGET?.trim();
 
 console.log("\n환경 변수");
 console.log(`  ${mark(jsKey)}  NEXT_PUBLIC_KAKAO_JS_KEY`);
 console.log(`  ${mark(restKey)}  KAKAO_REST_KEY`);
-console.log(`  ${mark(upstash)}  UPSTASH_REDIS_REST_URL + TOKEN`);
+console.log(
+  `  ${mark(upstash)}  Upstash Redis${upstashNaming ? ` (${upstashNaming})` : ""}`,
+);
+if (has("REDIS_URL") && !upstash) {
+  console.log("          REDIS_URL만 있습니다 — REST 클라이언트로는 쓸 수 없습니다");
+}
 console.log(`  ${budget ? "설정됨" : "기본값"}  KAKAO_DAILY_BUDGET${budget ? ` (${budget})` : " (8000)"}`);
 
 console.log("\n이 설정으로 배포하면");

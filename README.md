@@ -103,7 +103,23 @@ Deployment Protection(Vercel Authentication)이 켜져 있으면 **Vercel 로그
 리전은 `vercel.json`에서 `icn1`(서울)로 고정합니다. 기본값(`iad1`, 미국 동부)이면 서버가
 `dapi.kakao.com`을 호출할 때마다 태평양을 왕복해서 리빌 판정이 눈에 띄게 느려집니다.
 
-Storage → Upstash Redis를 연결하면 `UPSTASH_*`가 자동 주입됩니다.
+### 4. Upstash Redis 연결
+
+```
+Vercel → 프로젝트 → Storage 탭 → Create Database → Upstash for Redis
+```
+
+> **리전을 반드시 `ap-northeast-1`(도쿄)로 고르세요.** Vercel 함수가 서울(`icn1`)에서
+> 돌기 때문에, us-east를 고르면 요청마다 Redis를 태평양 왕복하게 되어 모든 API 호출에
+> 300ms 이상이 붙습니다. 서울 리전이 없으면 도쿄가 가장 가깝습니다.
+
+연결하면 환경변수가 자동 주입됩니다. 통합 버전에 따라 이름이 두 가지로 갈립니다 —
+`UPSTASH_REDIS_REST_URL` / `_TOKEN` 또는 예전 Vercel KV 이름인 `KV_REST_API_URL` / `_TOKEN`.
+**코드가 양쪽 다 받으므로 이름은 신경 쓰지 않아도 됩니다.** (`REDIS_URL`은 `redis://`
+프로토콜이라 REST 클라이언트로 쓸 수 없어 무시합니다)
+
+주입 후 **재배포해야 런타임에 반영됩니다.** `npm run preflight`가 어느 이름으로 들어왔는지
+찍어주니 확인에 쓰세요.
 
 > **REST 키를 쓰면서 Upstash가 없으면 preflight가 실패합니다.** 캐시와 rate limit이
 > 서버리스 인스턴스별로 흩어져서 카카오 쿼터를 예상보다 훨씬 빨리 태우고,

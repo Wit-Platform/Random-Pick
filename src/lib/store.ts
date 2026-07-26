@@ -21,8 +21,24 @@ export interface Store {
   expire(key: string, ttlSec: number): Promise<void>;
 }
 
-const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
-const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+/**
+ * Vercel의 Upstash 통합은 버전에 따라 `UPSTASH_REDIS_REST_*` 또는 예전 Vercel KV
+ * 이름인 `KV_REST_API_*`로 환경변수를 주입합니다. 둘 다 같은 Upstash REST 엔드포인트라
+ * 어느 쪽이 와도 받습니다 — 한쪽만 읽으면 통합을 붙였는데도 조용히 메모리 폴백으로
+ * 돌아가서 원인 찾기가 어렵습니다.
+ *
+ * `REDIS_URL`(redis:// 프로토콜)은 REST 클라이언트로 쓸 수 없으므로 받지 않습니다.
+ */
+function firstEnv(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+const UPSTASH_URL = firstEnv("UPSTASH_REDIS_REST_URL", "KV_REST_API_URL");
+const UPSTASH_TOKEN = firstEnv("UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN");
 
 function createUpstashStore(url: string, token: string): Store {
   async function cmd<T>(...args: (string | number)[]): Promise<T> {
