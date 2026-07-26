@@ -56,10 +56,29 @@ KAKAO_REST_KEY=xxx npm run verify:kakao
 
 ### 3. Vercel 배포
 
+**카카오 키보다 배포가 먼저입니다.** 카카오 콘솔에 등록할 도메인이 배포 후에 생깁니다.
+
 ```bash
 npm run preflight   # 환경변수 조합이 어떤 동작을 만드는지 확인
-vercel
 ```
+
+키 없이 배포해도 샘플 모드로 정상 동작합니다. GitHub 연동(Vercel 대시보드 → Add New →
+Project → 이 레포 import)이 편합니다. 빌드 설정은 건드릴 것이 없습니다.
+
+배포되면 도메인이 세 종류 생깁니다.
+
+| 종류 | 형태 | 안정성 |
+| --- | --- | --- |
+| 프로덕션 | `<project>.vercel.app` | 고정 |
+| 브랜치 별칭 | `<project>-git-<branch>-<scope>.vercel.app` | 브랜치당 고정 |
+| 배포별 URL | `<project>-<hash>-<scope>.vercel.app` | **커밋마다 바뀜** |
+
+> **카카오 사이트 도메인은 와일드카드를 지원하지 않습니다.** `*.vercel.app`을 등록할 수
+> 없으므로 **프로덕션 도메인과 브랜치 별칭을 각각 등록**하세요. 커밋별 preview URL에서는
+> 지도가 뜨지 않는 것이 정상입니다. 자체 도메인을 붙이면 이 문제가 사라집니다.
+
+리전은 `vercel.json`에서 `icn1`(서울)로 고정합니다. 기본값(`iad1`, 미국 동부)이면 서버가
+`dapi.kakao.com`을 호출할 때마다 태평양을 왕복해서 리빌 판정이 눈에 띄게 느려집니다.
 
 Storage → Upstash Redis를 연결하면 `UPSTASH_*`가 자동 주입됩니다.
 
