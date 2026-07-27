@@ -43,7 +43,9 @@ export interface MapStageProps {
   radiusM: number;
   phase: Phase;
   placeMode: boolean;
-  winner: Place | null;
+  /** 리빌 결과. 첫 번째가 가장 가까운 곳이고 pickedIndex가 지금 고른 곳입니다 */
+  results: Place[];
+  pickedIndex: number;
   landing: LatLng | null;
   /** 값이 바뀌면 방향 무작위로 한 번 던집니다 (키보드·접근성 대체 수단) */
   blindThrowNonce: number;
@@ -259,10 +261,10 @@ export default function MapStage(props: MapStageProps) {
     }
   }, [props.phase, setBlur]);
 
-  /** 당첨 핀 등장 시각 — 팝인 애니메이션 기준점 */
+  /** 핀 등장 시각 — 팝인 애니메이션 기준점 */
   useEffect(() => {
-    pinShownAtRef.current = props.winner ? performance.now() : 0;
-  }, [props.winner]);
+    pinShownAtRef.current = props.results.length > 0 ? performance.now() : 0;
+  }, [props.results]);
 
   /* ── 던지기 ───────────────────────────────────────── */
 
@@ -402,7 +404,8 @@ export default function MapStage(props: MapStageProps) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
 
-      const { base, radiusM, phase, landing, winner } = propsRef.current;
+      const { base, radiusM, phase, landing, results, pickedIndex } =
+        propsRef.current;
       if (!base) return;
 
       const view = controller.getView();
@@ -594,48 +597,71 @@ export default function MapStage(props: MapStageProps) {
         ctx.restore();
       }
 
-      // 9. 당첨 핀 — flare는 여기에만 씁니다
-      if (revealing && winner) {
-        const pt = controller.project(winner);
+      // 9. 결과 핀 — flare는 여기에만 씁니다. 고른 곳이 가장 크고 선명합니다
+      if (revealing && results.length > 0) {
         const age = pinShownAtRef.current ? now - pinShownAtRef.current : 999;
-        const t = Math.min(1, age / 320);
-        // 살짝 튀어오르는 오버슈트
-        const scale = t < 1 ? 1 + Math.sin(Math.PI * t) * 0.45 * (1 - t) : 1;
-        const grow = Math.min(1, age / 200);
 
-        ctx.save();
-        ctx.translate(pt.x, pt.y);
-        ctx.scale(grow * scale, grow * scale);
+        /**
+         * 가까운 곳들이라 핀이 겹칩니다. 고른 핀을 **맨 마지막에** 그려 항상 위로
+         * 올립니다 — 뒤 순번을 골랐는데 1번에 가려지면 뭘 고른 건지 알 수 없습니다.
+         */
+        const order = results.map((_, i) => i).filter((i) => i !== pickedIndex);
+        order.reverse();
+        if (results[pickedIndex]) order.push(pickedIndex);
 
-        // 맥동 링
-        const pulse = (age % 1600) / 1600;
-        ctx.globalAlpha = (1 - pulse) * 0.5;
-        ctx.strokeStyle = palette.flare;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, 8 + pulse * 22, 0, Math.PI * 2);
-        ctx.stroke();
+        for (const i of order) {
+          const place = results[i];
+          if (!place) continue;
+          const pt = controller.project(place);
+          const isPicked = i === pickedIndex;
 
-        // 핀
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = palette.flare;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(-5.5, -16);
-        ctx.lineTo(5.5, -16);
-        ctx.closePath();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(0, -22, 9.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = palette.surface;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.fillStyle = palette.surface;
-        ctx.beginPath();
-        ctx.arc(0, -22, 3.4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+          // 순서대로 조금씩 늦게 등장시켜 하나씩 꽂히는 느낌을 냅니다
+          const delay = i * 90;
+          const local = age - delay;
+          if (local < 0) continue;
+          const t = Math.min(1, local / 320);
+          const overshoot = t < 1 ? 1 + Math.sin(Math.PI * t) * 0.4 * (1 - t) : 1;
+          const grow = Math.min(1, local / 200);
+          const scale = grow * overshoot * (isPicked ? 1 : 0.78);
+
+          ctx.save();
+          ctx.translate(pt.x, pt.y);
+          ctx.scale(scale, scale);
+
+          if (isPicked) {
+            const pulse = (local % 1600) / 1600;
+            ctx.globalAlpha = (1 - pulse) * 0.5;
+            ctx.strokeStyle = palette.flare;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 8 + pulse * 22, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          ctx.globalAlpha = isPicked ? 1 : 0.72;
+          ctx.fillStyle = palette.flare;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(-5.5, -16);
+          ctx.lineTo(5.5, -16);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(0, -22, 10, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = palette.surface;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // 번호 — 목록의 순서와 맞춰 어느 핀인지 알 수 있게
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = palette.surface;
+          ctx.font = "700 12px ui-monospace, monospace";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(String(i + 1), 0, -22);
+          ctx.restore();
+        }
       }
     };
 

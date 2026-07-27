@@ -61,9 +61,13 @@ interface State {
   geoDenied: boolean;
   landing: LatLng | null;
   resolving: boolean;
-  winner: Place | null;
-  distFromBase: number;
-  distFromLanding: number;
+  /**
+   * 착지점에서 가까운 순서로 최대 5곳. 첫 번째가 당첨이고 나머지는 대안입니다.
+   * 비어 있으면 허탕입니다.
+   */
+  revealed: Place[];
+  /** 지금 고른 곳. 대안을 누르면 바뀝니다 */
+  pickedIndex: number;
   missStreak: number;
   decided: boolean;
   sdkError: string | null;
@@ -92,11 +96,12 @@ type Action =
   | { type: "landed"; landing: LatLng }
   | {
       type: "reveal";
-      winner: Place | null;
+      places: Place[];
       source: DataSource | null;
       reason?: SampleReason;
       miss: MissReason;
     }
+  | { type: "pick"; index: number }
   | { type: "showResult" }
   | { type: "again" }
   | { type: "decide" }
@@ -128,9 +133,8 @@ const initialState: State = {
   geoDenied: false,
   landing: null,
   resolving: false,
-  winner: null,
-  distFromBase: 0,
-  distFromLanding: 0,
+  revealed: [],
+  pickedIndex: 0,
   missStreak: 0,
   decided: false,
   sdkError: null,
@@ -155,7 +159,8 @@ function reducer(state: State, action: Action): State {
         locating: false,
         phase: "idle",
         landing: null,
-        winner: null,
+        revealed: [],
+        pickedIndex: 0,
         resolving: false,
         decided: false,
         missStreak: 0,
@@ -180,7 +185,8 @@ function reducer(state: State, action: Action): State {
         ),
         phase: "idle",
         landing: null,
-        winner: null,
+        revealed: [],
+        pickedIndex: 0,
         decided: false,
       };
 
@@ -205,7 +211,8 @@ function reducer(state: State, action: Action): State {
         ...state,
         phase: "flying",
         landing: null,
-        winner: null,
+        revealed: [],
+        pickedIndex: 0,
         decided: false,
         resolving: false,
         miss: null,
@@ -216,21 +223,23 @@ function reducer(state: State, action: Action): State {
       return { ...state, phase: "reveal", landing: action.landing, resolving: true };
 
     case "reveal": {
-      const landing = state.landing;
-      const winner = action.winner;
+      const hit = action.places.length > 0;
       return {
         ...state,
         resolving: false,
-        winner,
+        revealed: action.places,
+        pickedIndex: 0,
         miss: action.miss,
         source: action.source ?? state.source,
         sampleReason: action.reason ?? state.sampleReason,
         notice: action.source ? null : state.notice,
-        distFromBase: winner ? distanceM(state.base, winner) : 0,
-        distFromLanding: winner && landing ? distanceM(landing, winner) : 0,
-        missStreak: winner ? 0 : state.missStreak + 1,
+        missStreak: hit ? 0 : state.missStreak + 1,
       };
     }
+
+    case "pick":
+      // 대안으로 바꿔도 "결정"은 다시 눌러야 합니다
+      return { ...state, pickedIndex: action.index, decided: false };
 
     case "showResult":
       return { ...state, phase: "result" };
@@ -240,7 +249,8 @@ function reducer(state: State, action: Action): State {
         ...state,
         phase: "idle",
         landing: null,
-        winner: null,
+        revealed: [],
+        pickedIndex: 0,
         resolving: false,
         decided: false,
       };
@@ -280,7 +290,8 @@ function reducer(state: State, action: Action): State {
         cats: action.condition.cats,
         phase: "idle",
         landing: null,
-        winner: null,
+        revealed: [],
+        pickedIndex: 0,
         resolving: false,
         decided: false,
         missStreak: 0,
@@ -394,11 +405,11 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
 
     // 반경을 넘겨 던졌으면 조회할 필요가 없습니다
     if (distanceM(base, landing) > radiusM) {
-      dispatch({ type: "reveal", winner: null, source: null, miss: "overshoot" });
+      dispatch({ type: "reveal", places: [], source: null, miss: "overshoot" });
       return;
     }
     if (cats.length === 0) {
-      dispatch({ type: "reveal", winner: null, source: null, miss: "empty" });
+      dispatch({ type: "reveal", places: [], source: null, miss: "empty" });
       return;
     }
 
@@ -408,7 +419,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
       lng: String(landing.lng),
       radius: String(Math.round(revealRadiusM(radiusM))),
       cats: cats.join(","),
-      limit: "1",
+      limit: "5",
     });
 
     fetch(`/api/places?${params}`, { signal: abort.signal })
@@ -430,19 +441,19 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
       })
       .then((data) => {
         if (abort.signal.aborted) return;
-        const winner = data?.places[0] ?? null;
+        const places = data?.places ?? [];
         dispatch({
           type: "reveal",
-          winner,
+          places,
           source: data?.source ?? null,
           reason: data?.reason,
-          miss: winner ? null : "empty",
+          miss: places.length > 0 ? null : "empty",
         });
       })
       .catch(() => {
         // 조회 실패는 허탕으로 처리합니다 — 에러로 게임을 막지 않습니다
         if (!abort.signal.aborted) {
-          dispatch({ type: "reveal", winner: null, source: null, miss: "empty" });
+          dispatch({ type: "reveal", places: [], source: null, miss: "empty" });
         }
       });
 
@@ -638,8 +649,10 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
   const onDecide = useCallback(async () => {
     dispatch({ type: "decide" });
 
-    const { groupCode, nick, winner, distFromBase } = state;
+    const { groupCode, nick } = state;
+    const winner = state.revealed[state.pickedIndex];
     if (!groupCode || !nick.trim() || !winner) return;
+    const distFromBase = distanceM(state.base, winner);
 
     try {
       const res = await fetch(`/api/group/${groupCode}/throws`, {
@@ -664,7 +677,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
   const showMiss =
     (state.phase === "reveal" || state.phase === "result") &&
     !state.resolving &&
-    !state.winner;
+    state.revealed.length === 0;
 
   const banner = state.sdkError
     ? { kind: "error" as const, text: state.sdkError }
@@ -703,7 +716,8 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
             radiusM={state.radiusM}
             phase={state.phase}
             placeMode={state.placeMode}
-            winner={state.winner}
+            results={state.revealed}
+            pickedIndex={state.pickedIndex}
             landing={state.landing}
             blindThrowNonce={state.blindNonce}
             onPickBase={onPickBase}
@@ -745,9 +759,11 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
 
         {state.phase === "result" ? (
           <ResultCard
-            winner={state.winner}
-            distFromBase={state.distFromBase}
-            distFromLanding={state.distFromLanding}
+            results={state.revealed}
+            pickedIndex={state.pickedIndex}
+            base={state.base}
+            landing={state.landing}
+            onPick={(index) => dispatch({ type: "pick", index })}
             source={state.source ?? "sample"}
             decided={state.decided}
             missStreak={state.missStreak}

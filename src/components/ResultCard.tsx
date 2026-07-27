@@ -3,15 +3,17 @@
 import { useEffect, useRef } from "react";
 
 import { categoryLabel } from "@/lib/categories";
-import { formatDistance, walkMinutes } from "@/lib/geo";
-import type { DataSource, Place } from "@/lib/types";
+import { distanceM, formatDistance, walkMinutes } from "@/lib/geo";
+import type { DataSource, LatLng, Place } from "@/lib/types";
 
 import type { MissReason } from "./Game";
 
 export interface ResultCardProps {
-  winner: Place | null;
-  distFromBase: number;
-  distFromLanding: number;
+  /** 착지점에서 가까운 순서. 비어 있으면 허탕 */
+  results: Place[];
+  pickedIndex: number;
+  base: LatLng;
+  landing: LatLng | null;
   source: DataSource;
   decided: boolean;
   missStreak: number;
@@ -19,13 +21,15 @@ export interface ResultCardProps {
   missReason: MissReason;
   /** 그룹에 참가 중인지 — 결정 시 결과가 공개된다는 고지를 띄웁니다 */
   shared: boolean;
+  onPick: (index: number) => void;
   onAgain: () => void;
   onDecide: () => void;
   onWiden: () => void;
 }
 
 export default function ResultCard(props: ResultCardProps) {
-  const { winner, source, decided, missStreak, missReason, shared } = props;
+  const { results, pickedIndex, base, landing, source, decided, missStreak } =
+    props;
   const headingRef = useRef<HTMLParagraphElement | null>(null);
 
   /**
@@ -40,16 +44,16 @@ export default function ResultCard(props: ResultCardProps) {
     if (!el) return;
     el.focus({ preventScroll: true });
     el.scrollIntoView({ block: "nearest" });
-  }, [winner]);
+  }, [results]);
 
-  if (!winner) {
+  if (results.length === 0) {
     return (
       <div className="result miss" role="status" aria-live="polite">
         <p className="result-name" ref={headingRef} tabIndex={-1}>
           허탕
         </p>
         <p className="hint">
-          {missReason === "overshoot"
+          {props.missReason === "overshoot"
             ? "너무 멀리 던졌습니다. 돌이 반경을 넘어갔습니다."
             : "돌이 떨어진 자리 근처에 조건에 맞는 곳이 없었습니다."}
         </p>
@@ -76,39 +80,58 @@ export default function ResultCard(props: ResultCardProps) {
   return (
     <div className="result" role="status" aria-live="polite">
       <p className="result-name" ref={headingRef} tabIndex={-1}>
-        {winner.name}
+        돌이 떨어진 자리 {results.length}곳
       </p>
 
-      <div className="result-meta">
-        <span>{winner.detail || categoryLabel(winner.cat)}</span>
-        <span>
-          기준점에서 <span className="k">{formatDistance(props.distFromBase)}</span>
-          {" · 도보 "}
-          <span className="k">{walkMinutes(props.distFromBase)}분</span>
-        </span>
-      </div>
+      <ol className="picks">
+        {results.map((place, index) => {
+          const fromLanding = landing ? distanceM(landing, place) : 0;
+          const fromBase = distanceM(base, place);
+          const picked = index === pickedIndex;
 
-      <div className="result-meta">
-        <span>
-          던진 자리에서{" "}
-          <span className="k">{formatDistance(props.distFromLanding)}</span>
-        </span>
-        {winner.road ? <span>{winner.road}</span> : null}
-      </div>
+          return (
+            <li key={place.id}>
+              <button
+                type="button"
+                className={`pick${picked ? " on" : ""}`}
+                onClick={() => props.onPick(index)}
+                aria-pressed={picked}
+              >
+                <span className="pick-rank" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <span className="pick-body">
+                  <span className="pick-name">{place.name}</span>
+                  <span className="pick-meta">
+                    {place.detail || categoryLabel(place.cat)}
+                  </span>
+                  <span className="pick-meta">
+                    던진 자리에서{" "}
+                    <span className="k">{formatDistance(fromLanding)}</span> ·
+                    기준점에서 <span className="k">{formatDistance(fromBase)}</span>{" "}
+                    · 도보 <span className="k">{walkMinutes(fromBase)}분</span>
+                  </span>
+                </span>
+              </button>
 
-      {winner.url && source === "kakao" ? (
-        <a
-          className="map-link"
-          href={winner.url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          카카오맵에서 보기 →
-        </a>
-      ) : null}
+              {place.url && source === "kakao" ? (
+                <a
+                  className="pick-link"
+                  href={place.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${place.name} 카카오맵에서 보기`}
+                >
+                  지도 ↗
+                </a>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
 
       {/* 결정은 그룹에서만 의미가 있습니다 — 혼자 먹으러 갈 때 누를 버튼이 필요하지 않습니다 */}
-      {!shared ? (
+      {!props.shared ? (
         <div className="row">
           <button type="button" className="btn primary" onClick={props.onAgain}>
             다시 던지기
@@ -131,7 +154,7 @@ export default function ResultCard(props: ResultCardProps) {
               className="btn primary"
               onClick={props.onDecide}
             >
-              이걸로 결정
+              {pickedIndex + 1}번으로 결정
             </button>
             <button type="button" className="btn" onClick={props.onAgain}>
               다시 던지기
