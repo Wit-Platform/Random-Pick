@@ -597,48 +597,57 @@ export default function MapStage(props: MapStageProps) {
         ctx.restore();
       }
 
-      // 9. 결과 핀 — flare는 여기에만 씁니다. 고른 곳이 가장 크고 선명합니다
+      // 9. 결과 핀 — flare는 여기에만 씁니다
       if (revealing && results.length > 0) {
         const age = pinShownAtRef.current ? now - pinShownAtRef.current : 999;
 
         /**
-         * 가까운 곳들이라 핀이 겹칩니다. 고른 핀을 **맨 마지막에** 그려 항상 위로
-         * 올립니다 — 뒤 순번을 골랐는데 1번에 가려지면 뭘 고른 건지 알 수 없습니다.
+         * 대안은 작은 원으로만 표시하고 메인만 핀으로 꽂습니다.
+         * 번호를 붙이면 메인이 바뀔 때마다 순번이 어긋나 오히려 헷갈립니다.
+         * 대안을 고르면 그 자리로 핀이 옮겨가므로 대응은 그 순간에 드러납니다.
          */
-        const order = results.map((_, i) => i).filter((i) => i !== pickedIndex);
-        order.reverse();
-        if (results[pickedIndex]) order.push(pickedIndex);
-
-        for (const i of order) {
+        ctx.save();
+        for (let i = 0; i < results.length; i++) {
+          if (i === pickedIndex) continue;
           const place = results[i];
           if (!place) continue;
-          const pt = controller.project(place);
-          const isPicked = i === pickedIndex;
-
-          // 순서대로 조금씩 늦게 등장시켜 하나씩 꽂히는 느낌을 냅니다
-          const delay = i * 90;
-          const local = age - delay;
+          const local = age - i * 70;
           if (local < 0) continue;
-          const t = Math.min(1, local / 320);
-          const overshoot = t < 1 ? 1 + Math.sin(Math.PI * t) * 0.4 * (1 - t) : 1;
-          const grow = Math.min(1, local / 200);
-          const scale = grow * overshoot * (isPicked ? 1 : 0.78);
+          const grow = Math.min(1, local / 220);
+          const pt = controller.project(place);
+
+          ctx.globalAlpha = 0.55 * grow;
+          ctx.fillStyle = palette.flare;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 4.5 * grow, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 0.8 * grow;
+          ctx.strokeStyle = palette.surface;
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        const main = results[pickedIndex];
+        if (main) {
+          const pt = controller.project(main);
+          const t = Math.min(1, age / 320);
+          const overshoot = t < 1 ? 1 + Math.sin(Math.PI * t) * 0.45 * (1 - t) : 1;
+          const grow = Math.min(1, age / 200);
 
           ctx.save();
           ctx.translate(pt.x, pt.y);
-          ctx.scale(scale, scale);
+          ctx.scale(grow * overshoot, grow * overshoot);
 
-          if (isPicked) {
-            const pulse = (local % 1600) / 1600;
-            ctx.globalAlpha = (1 - pulse) * 0.5;
-            ctx.strokeStyle = palette.flare;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(0, 0, 8 + pulse * 22, 0, Math.PI * 2);
-            ctx.stroke();
-          }
+          const pulse = (age % 1600) / 1600;
+          ctx.globalAlpha = (1 - pulse) * 0.5;
+          ctx.strokeStyle = palette.flare;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, 0, 8 + pulse * 22, 0, Math.PI * 2);
+          ctx.stroke();
 
-          ctx.globalAlpha = isPicked ? 1 : 0.72;
+          ctx.globalAlpha = 1;
           ctx.fillStyle = palette.flare;
           ctx.beginPath();
           ctx.moveTo(0, 0);
@@ -647,19 +656,15 @@ export default function MapStage(props: MapStageProps) {
           ctx.closePath();
           ctx.fill();
           ctx.beginPath();
-          ctx.arc(0, -22, 10, 0, Math.PI * 2);
+          ctx.arc(0, -22, 9.5, 0, Math.PI * 2);
           ctx.fill();
           ctx.strokeStyle = palette.surface;
           ctx.lineWidth = 2;
           ctx.stroke();
-
-          // 번호 — 목록의 순서와 맞춰 어느 핀인지 알 수 있게
-          ctx.globalAlpha = 1;
           ctx.fillStyle = palette.surface;
-          ctx.font = "700 12px ui-monospace, monospace";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(String(i + 1), 0, -22);
+          ctx.beginPath();
+          ctx.arc(0, -22, 3.4, 0, Math.PI * 2);
+          ctx.fill();
           ctx.restore();
         }
       }

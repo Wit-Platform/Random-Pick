@@ -62,7 +62,7 @@ interface State {
   landing: LatLng | null;
   resolving: boolean;
   /**
-   * 착지점에서 가까운 순서로 최대 5곳. 첫 번째가 당첨이고 나머지는 대안입니다.
+   * 착지점에서 가까운 순서로 최대 4곳. pickedIndex가 메인이고 나머지는 대안입니다.
    * 비어 있으면 허탕입니다.
    */
   revealed: Place[];
@@ -419,7 +419,7 @@ export default function Game({ jsKey, liveData, groupEnabled }: GameProps) {
       lng: String(landing.lng),
       radius: String(Math.round(revealRadiusM(radiusM))),
       cats: cats.join(","),
-      limit: "5",
+      limit: "4",
     });
 
     fetch(`/api/places?${params}`, { signal: abort.signal })

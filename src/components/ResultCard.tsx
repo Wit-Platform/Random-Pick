@@ -11,6 +11,7 @@ import type { MissReason } from "./Game";
 export interface ResultCardProps {
   /** 착지점에서 가까운 순서. 비어 있으면 허탕 */
   results: Place[];
+  /** 메인으로 보여줄 항목. 대안을 누르면 이 자리로 옮겨옵니다 */
   pickedIndex: number;
   base: LatLng;
   landing: LatLng | null;
@@ -44,7 +45,7 @@ export default function ResultCard(props: ResultCardProps) {
     if (!el) return;
     el.focus({ preventScroll: true });
     el.scrollIntoView({ block: "nearest" });
-  }, [results]);
+  }, [results, pickedIndex]);
 
   if (results.length === 0) {
     return (
@@ -77,58 +78,97 @@ export default function ResultCard(props: ResultCardProps) {
     );
   }
 
+  const main = results[pickedIndex] ?? results[0]!;
+  const others = results
+    .map((place, index) => ({ place, index }))
+    .filter((entry) => entry.index !== pickedIndex);
+
+  const mainFromBase = distanceM(base, main);
+  const mainFromLanding = landing ? distanceM(landing, main) : 0;
+
   return (
     <div className="result" role="status" aria-live="polite">
       <p className="result-name" ref={headingRef} tabIndex={-1}>
-        돌이 떨어진 자리 {results.length}곳
+        {main.name}
       </p>
 
-      <ol className="picks">
-        {results.map((place, index) => {
-          const fromLanding = landing ? distanceM(landing, place) : 0;
-          const fromBase = distanceM(base, place);
-          const picked = index === pickedIndex;
+      <div className="result-meta">
+        <span>{main.detail || categoryLabel(main.cat)}</span>
+        <span>
+          기준점에서 <span className="k">{formatDistance(mainFromBase)}</span>
+          {" · 도보 "}
+          <span className="k">{walkMinutes(mainFromBase)}분</span>
+        </span>
+      </div>
 
-          return (
-            <li key={place.id}>
-              <button
-                type="button"
-                className={`pick${picked ? " on" : ""}`}
-                onClick={() => props.onPick(index)}
-                aria-pressed={picked}
-              >
-                <span className="pick-rank" aria-hidden="true">
-                  {index + 1}
-                </span>
-                <span className="pick-body">
-                  <span className="pick-name">{place.name}</span>
-                  <span className="pick-meta">
-                    {place.detail || categoryLabel(place.cat)}
-                  </span>
-                  <span className="pick-meta">
-                    던진 자리에서{" "}
-                    <span className="k">{formatDistance(fromLanding)}</span> ·
-                    기준점에서 <span className="k">{formatDistance(fromBase)}</span>{" "}
-                    · 도보 <span className="k">{walkMinutes(fromBase)}분</span>
-                  </span>
-                </span>
-              </button>
+      <div className="result-meta">
+        <span>
+          던진 자리에서{" "}
+          <span className="k">{formatDistance(mainFromLanding)}</span>
+        </span>
+        {main.road ? <span>{main.road}</span> : null}
+      </div>
 
-              {place.url && source === "kakao" ? (
-                <a
-                  className="pick-link"
-                  href={place.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`${place.name} 카카오맵에서 보기`}
-                >
-                  지도 ↗
-                </a>
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
+      {main.url && source === "kakao" ? (
+        <a
+          className="map-link"
+          href={main.url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          카카오맵에서 보기 →
+        </a>
+      ) : null}
+
+      {/* 마음에 안 들 때만 열어보는 대안. 접혀 있어야 리빌이 사건으로 남습니다 */}
+      {others.length > 0 ? (
+        <details className="alts">
+          <summary className="alts-toggle">
+            <span>맘에 안 들면 여긴 어때요?</span>
+            <span className="alts-meta">
+              {others.length}곳
+              <span className="chev" aria-hidden="true">
+                ›
+              </span>
+            </span>
+          </summary>
+
+          <ul className="alt-list">
+            {others.map(({ place, index }) => {
+              const fromLanding = landing ? distanceM(landing, place) : 0;
+              const fromBase = distanceM(base, place);
+              return (
+                <li key={place.id}>
+                  <button
+                    type="button"
+                    className="alt"
+                    onClick={() => props.onPick(index)}
+                  >
+                    <span className="alt-name">{place.name}</span>
+                    <span className="alt-meta">
+                      {place.detail || categoryLabel(place.cat)} · 던진 자리에서{" "}
+                      <span className="k">{formatDistance(fromLanding)}</span> ·
+                      기준점에서{" "}
+                      <span className="k">{formatDistance(fromBase)}</span>
+                    </span>
+                  </button>
+                  {place.url && source === "kakao" ? (
+                    <a
+                      className="pick-link"
+                      href={place.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${place.name} 카카오맵에서 보기`}
+                    >
+                      지도 ↗
+                    </a>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      ) : null}
 
       {/* 결정은 그룹에서만 의미가 있습니다 — 혼자 먹으러 갈 때 누를 버튼이 필요하지 않습니다 */}
       {!props.shared ? (
@@ -154,7 +194,7 @@ export default function ResultCard(props: ResultCardProps) {
               className="btn primary"
               onClick={props.onDecide}
             >
-              {pickedIndex + 1}번으로 결정
+              이걸로 결정
             </button>
             <button type="button" className="btn" onClick={props.onAgain}>
               다시 던지기
